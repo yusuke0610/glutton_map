@@ -1,0 +1,16 @@
+# backend
+backend/data/
+backend/server
+
+# web
+web/node_modules/
+web/dist/
+web/src/types.gen.ts
+
+# misc
+.DS_Store
+result
+.direnv/
+
+# local
+.study/report/

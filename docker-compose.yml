@@ -1,0 +1,9 @@
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/data:/app/data
+    environment:
+      - LIBSQL_URL=file:/app/data/pins.db

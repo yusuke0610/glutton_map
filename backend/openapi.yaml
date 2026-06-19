@@ -6,7 +6,7 @@ info:
     最小ヒートマップ・スライスの契約。これが唯一の真実（spec-first）。
     Go サーバ型は oapi-codegen、フロント TS 型は openapi-typescript で本ファイルから生成する。
 servers:
-  - url: http://localhost:8000
+  - url: http://localhost:8001
 paths:
   /api/pins:
     get:

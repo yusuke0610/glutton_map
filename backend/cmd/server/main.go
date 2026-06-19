@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -30,9 +31,16 @@ func main() {
 		log.Fatalf("seed: %v", err)
 	}
 
+	// 許可するフロントのオリジン。環境変数 CORS_ALLOW_ORIGINS（カンマ区切り）で
+	// 上書きでき、未設定ならローカル開発の既定値を使う。
+	allowOrigins := []string{"http://localhost:5173"}
+	if v := os.Getenv("CORS_ALLOW_ORIGINS"); v != "" {
+		allowOrigins = strings.Split(v, ",")
+	}
+
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"http://localhost:5173"},
+		AllowOrigins: allowOrigins,
 		AllowMethods: []string{"GET"},
 		AllowHeaders: []string{"Origin", "Content-Type"},
 		MaxAge:       12 * time.Hour,

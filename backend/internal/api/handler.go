@@ -24,7 +24,6 @@ func (h *Handler) GetApiPins(ctx context.Context, _ GetApiPinsRequestObject) (Ge
 
 	weight := 1
 	out := make([]Pin, 0, len(pins))
-	seen := map[pin.Prefecture]struct{}{}
 	for _, p := range pins {
 		w := weight
 		out = append(out, Pin{
@@ -33,12 +32,12 @@ func (h *Handler) GetApiPins(ctx context.Context, _ GetApiPinsRequestObject) (Ge
 			Lng:        p.Lng,
 			Weight:     &w,
 		})
-		seen[p.Prefecture] = struct{}{}
 	}
 
+	summary := pin.Summarize(pins)
 	return GetApiPins200JSONResponse{
 		Pins:            out,
-		PrefectureCount: len(seen),
-		Total:           len(out),
+		PrefectureCount: summary.PrefectureCount,
+		Total:           summary.Total,
 	}, nil
 }

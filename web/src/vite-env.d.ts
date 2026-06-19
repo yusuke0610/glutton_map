@@ -1,0 +1,11 @@
+/// <reference types="vite/client" />
+
+// Vite の環境変数の型定義。VITE_ 接頭辞のものだけがクライアントに公開される。
+interface ImportMetaEnv {
+  // API のベースURL（例: http://localhost:8000）。未設定可。
+  readonly VITE_API_BASE?: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}

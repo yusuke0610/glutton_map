@@ -32,7 +32,7 @@ export default function App() {
 
     map.on("load", async () => {
       const res = await fetchPins();
-      const geojson = {
+      const geojson: GeoJSON.FeatureCollection = {
         type: "FeatureCollection",
         features: res.pins.map((p) => ({
           type: "Feature",
@@ -40,7 +40,7 @@ export default function App() {
           properties: { weight: p.weight ?? 1 },
         })),
       };
-      map.addSource("pins", { type: "geojson", data: geojson as any });
+      map.addSource("pins", { type: "geojson", data: geojson });
       map.addLayer({
         id: "pins-heat",
         type: "heatmap",

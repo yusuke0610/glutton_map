@@ -19,6 +19,32 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      # Makefile の test ターゲット（go test -race -count=1 ./...）をそのまま使う。
-      - name: make test
-        run: make test
+      - name: make test-backend
+        run: make test-backend
+
+  web-test:
+    name: web lint & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: bun install
+        run: bun install --frozen-lockfile
+
+      # types.gen.ts は生成物（gitignore）なので openapi.yaml から生成しておく。
+      - name: gen types
+        run: bun run gen
+
+      - name: lint
+        run: bun run lint
+
+      - name: test
+        run: bun run test
+
+      - name: build
+        run: bun run build

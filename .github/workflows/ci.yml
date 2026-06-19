@@ -64,3 +64,34 @@ jobs:
 
       - name: build
         run: bun run build
+
+  e2e:
+    name: e2e (playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # E2E は Go バックエンドも起動するため両方のツールチェーンを用意する。
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: bun install
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      # フロントが import する types.gen.ts を生成しておく。
+      - name: gen types
+        working-directory: web
+        run: bun run gen
+
+      - name: install playwright browser
+        working-directory: web
+        run: bunx playwright install --with-deps chromium
+
+      - name: e2e
+        working-directory: web
+        run: bun run test:e2e

@@ -11,21 +11,9 @@
 
 ## 実行手順
 
-```bash
-nix develop
-
-# backend: 型生成 → ビルド
-cd backend && go generate ./... && go build ./...
-
-# API をコンテナ起動（localhost:8000）
-cd .. && docker compose up -d
-curl http://localhost:8000/api/pins        # pins / prefecture_count / total を含む JSON
-
-# frontend: 型生成 → 開発サーバ（localhost:5173）
-cd web
-bunx openapi-typescript ../backend/openapi.yaml -o src/types.gen.ts
-bun install && bun run dev
-```
+開発タスク（型生成・ビルド・コンテナ起動・テスト・Lint 等）はすべて **`Makefile` に集約**している。
+`nix develop` のシェル内で `make help` を実行すると、利用可能なターゲットの一覧が出る。
+個別のコマンドは README には書かず、`Makefile` を唯一の入口とする。
 
 ## ヒーロー指標
 `prefecture_count` =「何都道府県に散らばっているか」。人数より広がりを主役にする。

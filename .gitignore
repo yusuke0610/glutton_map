@@ -6,6 +6,11 @@ backend/server
 web/node_modules/
 web/dist/
 web/src/types.gen.ts
+# Playwright の成果物
+web/playwright-report/
+web/test-results/
+# E2E 用の使い捨て DB
+backend/e2e.db
 # 実 env ファイルは管理外（.env.example だけ追跡する）
 web/.env
 web/.env.*
@@ -26,3 +31,6 @@ result
 
 # tool 生成のログ等
 report/
+
+# tsc incremental 成果物
+web/*.tsbuildinfo

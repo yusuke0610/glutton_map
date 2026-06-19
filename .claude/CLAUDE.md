@@ -43,15 +43,19 @@ docker compose up -d            # localhost:8000
 このプロダクトは **TDD（テスト駆動開発）** で進める。Red（失敗するテストを先に書く）→ Green（最小実装で通す）→ Refactor のサイクルを回す。テスト実行は必ず Makefile 経由で行う。
 
 ```bash
-make test          # backend + web 両方
+make test          # backend + web の単体/結合（E2E は含まない）
 make test-backend  # go test -race -count=1 ./...
 make test-web      # フロント vitest（cd web && bun run test）
+make test-e2e      # E2E（Playwright）。backend+frontend を起動して縦割りを通す
 make lint          # = lint-backend + lint-web
 make lint-backend  # golangci-lint run ./...
 make lint-web      # フロント eslint（cd web && bun run lint）
 ```
 
-backend は Go 標準 `testing`（`-race`/`-count=1`）＋ **golangci-lint**（`backend/.golangci.yml`、govet/staticcheck/errcheck 等）。フロントは **vitest**（`web/src/*.test.ts`）でロジックをテストし、**eslint**（flat config: `web/eslint.config.js`）で静的検査する。これらは GitHub Actions（`.github/workflows/ci.yml`）の PR で自動実行される（backend-test / backend-lint / web-test の3ジョブ）。検証は build + curl + ブラウザ目視に加え、上記のテストで行う。
+- **backend**: Go 標準 `testing`（`-race`/`-count=1`）＋ **golangci-lint**（`backend/.golangci.yml`）。リポジトリ層は `t.TempDir()` の実 SQLite で結合テスト、HTTP 契約は `httptest` で `/api/pins` を検証する。
+- **frontend**: **vitest**（`web/src/*.test.ts`）でロジックを単体テスト、**eslint**（flat config: `web/eslint.config.js`）で静的検査。
+- **E2E**: **Playwright**（`web/e2e/*.spec.ts`、`web/playwright.config.ts`）。backend(:8000)+frontend(:5173)を webServer で起動し、地図がピンを取得・描画するまでを通す。vitest が `*.spec.ts` を拾わないよう vitest の `include` は `src/**/*.test.ts` に限定。
+- CI（`.github/workflows/ci.yml`）の PR で **backend-test / backend-lint / web-test / e2e** の4ジョブが自動実行される。
 
 ## アーキテクチャ
 

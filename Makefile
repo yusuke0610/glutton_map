@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help gen gen-backend gen-web build build-backend build-web \
-        test test-backend test-web lint lint-backend lint-web run dev up down clean
+        test test-backend test-web test-e2e lint lint-backend lint-web run dev up down clean
 
 ## help: ターゲット一覧を表示
 help:
@@ -42,6 +42,10 @@ test-backend:
 ## test-web: フロントのテスト（vitest）
 test-web:
 	cd web && bun install && bun run test
+
+## test-e2e: E2E（Playwright）。backend+frontend を起動して縦割りを通す
+test-e2e:
+	cd web && bun install && bunx playwright install chromium && bun run test:e2e
 
 ## lint: バックエンド・フロント両方の静的解析
 lint: lint-backend lint-web

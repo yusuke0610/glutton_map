@@ -6,7 +6,14 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   // 生成物・成果物は対象外。
-  { ignores: ["dist", "src/types.gen.ts"] },
+  {
+    ignores: [
+      "dist",
+      "src/types.gen.ts",
+      "playwright-report",
+      "test-results",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -25,6 +32,13 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+    },
+  },
+  // 設定ファイルと E2E は Node 環境（process など）。
+  {
+    files: ["*.config.{js,ts}", "e2e/**/*.ts"],
+    languageOptions: {
+      globals: globals.node,
     },
   },
 );

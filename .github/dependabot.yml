@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # SHA ピン留めした GitHub Actions を追従更新する（ピンの陳腐化対策）。
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+
+  # backend の Go モジュール。
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: backend

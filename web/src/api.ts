@@ -1,4 +1,5 @@
 import type { components } from "./types.gen";
+import { logger } from "./logger";
 
 export type PinsResponse = components["schemas"]["PinsResponse"];
 
@@ -7,8 +8,10 @@ export type PinsResponse = components["schemas"]["PinsResponse"];
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 export async function fetchPins(): Promise<PinsResponse> {
+  logger.debug("fetchPins: requesting", `${API_BASE}/api/pins`);
   const res = await fetch(`${API_BASE}/api/pins`);
   if (!res.ok) {
+    logger.error("fetchPins failed", res.status);
     throw new Error(`fetchPins failed: ${res.status}`);
   }
   return res.json();

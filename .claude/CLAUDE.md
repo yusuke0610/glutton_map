@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **spec-first / 単一の真実**: `backend/openapi.yaml` が唯一の契約。Go サーバ型は oapi-codegen、フロント TS 型は openapi-typescript で **同じ yaml から生成する**。**両側の型を手書きしてはいけない**（`internal/api/gen.go` と `web/src/types.gen.ts` は生成物）。
 - **DB の隔離**: `database/sql` とドライバ（`modernc.org/sqlite`）を import してよいのは `backend/internal/pin/repository.go` **だけ**。他層は `PinRepository` interface 越しにアクセスする。`grep -rl "database/sql" internal cmd` が1ファイルに収まることを保つ。
 - **最小スコープ**: スコープ外（実装しない）= LLMモデレーション / Turnstile / 通報 / PostGIS等の高度集計 / クラスタリング / ピン個別ポップアップ / go-libsql(cgo)実装 / `weight` カラム。緯度経度はただのカラム、密度は件数で表現する。
+- **TDD 遵守**: 機能追加・変更は必ず **TDD（Red→Green→Refactor）** で進める。まず失敗するテストを書いて赤を確認し、最小実装で緑にし、緑を保ったままリファクタする。**実装を先に書いてはいけない**。テストは `make test` 経由で実行する（詳細は「テスト」節）。
 
 ## 開発コマンド
 
@@ -36,7 +37,16 @@ bun run build                   # tsc + vite（型チェック込み）
 docker compose up -d            # localhost:8000
 ```
 
-テストスイートは未整備。検証は上記の build + curl + ブラウザ目視で行う。
+### テスト
+
+このプロダクトは **TDD（テスト駆動開発）** で進める。Red（失敗するテストを先に書く）→ Green（最小実装で通す）→ Refactor のサイクルを回す。テスト実行は必ず Makefile 経由で行う。
+
+```bash
+make test          # = test-backend。go test -race -count=1 ./...
+make test-backend  # バックエンドのみ
+```
+
+`-race`（データ競合検出）と `-count=1`（キャッシュ無効化で毎回実行）を付ける。検証は build + curl + ブラウザ目視に加え、上記のテストで行う。
 
 ## アーキテクチャ
 

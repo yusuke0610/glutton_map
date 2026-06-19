@@ -6,4 +6,7 @@ services:
     volumes:
       - ./backend/data:/app/data
     environment:
-      - LIBSQL_URL=file:/app/data/pins.db
+      # ${VAR:-既定値} … 未設定なら既定値、ルートの .env やシェルがあれば上書き。
+      - LIBSQL_URL=${LIBSQL_URL}
+      # 許可するフロントのオリジン（カンマ区切りで複数可）
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}

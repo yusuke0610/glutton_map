@@ -6,6 +6,15 @@ backend/server
 web/node_modules/
 web/dist/
 web/src/types.gen.ts
+# 実 env ファイルは管理外（.env.example だけ追跡する）
+web/.env
+web/.env.*
+!web/.env.example
+
+# secrets — ルートの実 env ファイルは管理外（docker-compose が自動で読む。.env.example だけ追跡）
+.env
+.env.*
+!.env.example
 
 # misc
 .DS_Store

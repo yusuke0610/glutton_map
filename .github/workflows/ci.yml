@@ -22,6 +22,22 @@ jobs:
       - name: make test-backend
         run: make test-backend
 
+  backend-lint:
+    name: backend lint (golangci-lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.12.2
+          working-directory: backend
+
   web-test:
     name: web lint & test
     runs-on: ubuntu-latest

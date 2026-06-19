@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help gen gen-backend gen-web build build-backend build-web \
-        test test-backend test-web lint run dev up down clean
+        test test-backend test-web lint lint-backend lint-web run dev up down clean
 
 ## help: ターゲット一覧を表示
 help:
@@ -43,8 +43,15 @@ test-backend:
 test-web:
 	cd web && bun install && bun run test
 
-## lint: フロントの eslint
-lint:
+## lint: バックエンド・フロント両方の静的解析
+lint: lint-backend lint-web
+
+## lint-backend: golangci-lint（govet/staticcheck/errcheck 等）
+lint-backend:
+	cd backend && golangci-lint run ./...
+
+## lint-web: フロントの eslint
+lint-web:
 	cd web && bun install && bun run lint
 
 ## run: API をローカル起動（:8000、PORT env で変更可）

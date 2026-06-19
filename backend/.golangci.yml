@@ -1,0 +1,6 @@
+# golangci-lint v2 設定。既定（standard）の linter 群を有効にする。
+# standard = errcheck / govet / ineffassign / staticcheck / unused。
+version: "2"
+
+linters:
+  default: standard

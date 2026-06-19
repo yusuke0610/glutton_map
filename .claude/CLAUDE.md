@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **DB の隔離**: `database/sql` とドライバ（`modernc.org/sqlite`）を import してよいのは `backend/internal/pin/repository.go` **だけ**。他層は `PinRepository` interface 越しにアクセスする。`grep -rl "database/sql" internal cmd` が1ファイルに収まることを保つ。
 - **最小スコープ**: スコープ外（実装しない）= LLMモデレーション / Turnstile / 通報 / PostGIS等の高度集計 / クラスタリング / ピン個別ポップアップ / go-libsql(cgo)実装 / `weight` カラム。緯度経度はただのカラム、密度は件数で表現する。
 - **TDD 遵守**: 機能追加・変更は必ず **TDD（Red→Green→Refactor）** で進める。まず失敗するテストを書いて赤を確認し、最小実装で緑にし、緑を保ったままリファクタする。**実装を先に書いてはいけない**。テストは `make test` 経由で実行する（詳細は「テスト」節）。
+- **push / PR は勝手にやらない**: `git push` と PR 作成（`gh pr create` 等）は、ユーザーが明示的に指示したときだけ実行する。ローカルでの commit までは進めてよいが、リモートへ反映する操作は必ず事前に許可を取る。
 
 ## 開発コマンド
 
@@ -45,10 +46,12 @@ docker compose up -d            # localhost:8000
 make test          # backend + web 両方
 make test-backend  # go test -race -count=1 ./...
 make test-web      # フロント vitest（cd web && bun run test）
-make lint          # フロント eslint（cd web && bun run lint）
+make lint          # = lint-backend + lint-web
+make lint-backend  # golangci-lint run ./...
+make lint-web      # フロント eslint（cd web && bun run lint）
 ```
 
-backend は Go 標準 `testing`（`-race`/`-count=1`）。フロントは **vitest**（`web/src/*.test.ts`）でロジックをテストし、**eslint**（flat config: `web/eslint.config.js`）で静的検査する。これらは GitHub Actions（`.github/workflows/ci.yml`）の PR で自動実行される。検証は build + curl + ブラウザ目視に加え、上記のテストで行う。
+backend は Go 標準 `testing`（`-race`/`-count=1`）＋ **golangci-lint**（`backend/.golangci.yml`、govet/staticcheck/errcheck 等）。フロントは **vitest**（`web/src/*.test.ts`）でロジックをテストし、**eslint**（flat config: `web/eslint.config.js`）で静的検査する。これらは GitHub Actions（`.github/workflows/ci.yml`）の PR で自動実行される（backend-test / backend-lint / web-test の3ジョブ）。検証は build + curl + ブラウザ目視に加え、上記のテストで行う。
 
 ## アーキテクチャ
 

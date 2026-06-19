@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help gen gen-backend gen-web build build-backend build-web \
-        test test-backend run dev up down clean
+        test test-backend test-web lint run dev up down clean
 
 ## help: ターゲット一覧を表示
 help:
@@ -32,12 +32,20 @@ build-backend: gen-backend
 build-web: gen-web
 	cd web && bun install && bun run build
 
-## test: バックエンドのテストを実行
-test: test-backend
+## test: バックエンド・フロント両方のテストを実行
+test: test-backend test-web
 
 ## test-backend: go test（-race / -count=1 で実行）
 test-backend:
 	cd backend && go test -race -count=1 ./...
+
+## test-web: フロントのテスト（vitest）
+test-web:
+	cd web && bun install && bun run test
+
+## lint: フロントの eslint
+lint:
+	cd web && bun install && bun run lint
 
 ## run: API をローカル起動（:8000、PORT env で変更可）
 run:

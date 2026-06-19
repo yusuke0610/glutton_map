@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -12,10 +12,15 @@ import (
 
 	"github.com/kisaragi-ai-map/backend/internal/api"
 	"github.com/kisaragi-ai-map/backend/internal/db"
+	"github.com/kisaragi-ai-map/backend/internal/logger"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
 )
 
 func main() {
+	// 構造化ロガーを用意し、標準 slog のデフォルトにも設定する。
+	log := logger.New(os.Stdout)
+	slog.SetDefault(log)
+
 	dsn := os.Getenv("LIBSQL_URL")
 	if dsn == "" {
 		dsn = "file:./data/pins.db"
@@ -23,12 +28,14 @@ func main() {
 
 	repo, err := pin.NewSQLiteRepository(dsn)
 	if err != nil {
-		log.Fatalf("open db: %v", err)
+		log.Error("open db", "error", err)
+		os.Exit(1)
 	}
 
 	// 起動時、DB が空なら seed を流す。
 	if err := db.Seed(context.Background(), repo); err != nil {
-		log.Fatalf("seed: %v", err)
+		log.Error("seed", "error", err)
+		os.Exit(1)
 	}
 
 	// 許可するフロントのオリジン。環境変数 CORS_ALLOW_ORIGINS（カンマ区切り）で
@@ -38,7 +45,10 @@ func main() {
 		allowOrigins = strings.Split(v, ",")
 	}
 
-	router := gin.Default()
+	// gin.Default() は標準の text ロガーを含むため、gin.New() に
+	// Recovery と自前の slog リクエストログを載せて構造化ログに統一する。
+	router := gin.New()
+	router.Use(gin.Recovery(), requestLogger(log))
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: allowOrigins,
 		AllowMethods: []string{"GET"},
@@ -54,7 +64,24 @@ func main() {
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port
 	}
+	log.Info("server starting", "addr", addr)
 	if err := router.Run(addr); err != nil {
-		log.Fatalf("run: %v", err)
+		log.Error("run", "error", err)
+		os.Exit(1)
+	}
+}
+
+// requestLogger は1リクエストごとに method/path/status/latency を構造化ログに出す。
+func requestLogger(l *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		l.Info("request",
+			"method", c.Request.Method,
+			"path", c.Request.URL.Path,
+			"status", c.Writer.Status(),
+			"latency_ms", time.Since(start).Milliseconds(),
+			"client_ip", c.ClientIP(),
+		)
 	}
 }

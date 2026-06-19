@@ -42,11 +42,13 @@ docker compose up -d            # localhost:8000
 このプロダクトは **TDD（テスト駆動開発）** で進める。Red（失敗するテストを先に書く）→ Green（最小実装で通す）→ Refactor のサイクルを回す。テスト実行は必ず Makefile 経由で行う。
 
 ```bash
-make test          # = test-backend。go test -race -count=1 ./...
-make test-backend  # バックエンドのみ
+make test          # backend + web 両方
+make test-backend  # go test -race -count=1 ./...
+make test-web      # フロント vitest（cd web && bun run test）
+make lint          # フロント eslint（cd web && bun run lint）
 ```
 
-`-race`（データ競合検出）と `-count=1`（キャッシュ無効化で毎回実行）を付ける。検証は build + curl + ブラウザ目視に加え、上記のテストで行う。
+backend は Go 標準 `testing`（`-race`/`-count=1`）。フロントは **vitest**（`web/src/*.test.ts`）でロジックをテストし、**eslint**（flat config: `web/eslint.config.js`）で静的検査する。これらは GitHub Actions（`.github/workflows/ci.yml`）の PR で自動実行される。検証は build + curl + ブラウザ目視に加え、上記のテストで行う。
 
 ## アーキテクチャ
 

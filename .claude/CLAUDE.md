@@ -38,7 +38,7 @@ make lint-web      # フロント eslint（cd web && bun run lint）
 ```
 
 - **backend**: Go 標準 `testing`（`-race`/`-count=1`）＋ **golangci-lint**（`backend/.golangci.yml`）。リポジトリ層は `t.TempDir()` の実 SQLite で結合テスト、HTTP 契約は `httptest` で `/api/pins` を検証する。
-- **frontend**: **vitest**（`web/src/*.test.ts`）でロジックを単体テスト、**eslint**（flat config: `web/eslint.config.js`）で静的検査。
+- **frontend**: **vitest**（`web/src/**/*.test.ts`）でロジックを単体テスト、**eslint**（flat config: `web/eslint.config.js`）で静的検査。
 - **E2E**: **Playwright**（`web/e2e/*.spec.ts`、`web/playwright.config.ts`）。backend(:8001)+frontend(:5174)を webServer で起動し、地図がピンを取得・描画するまでを通す。vitest が `*.spec.ts` を拾わないよう vitest の `include` は `src/**/*.test.ts` に限定。
 - CI（`.github/workflows/ci.yml`）の PR で **backend-test / backend-lint / web-test / e2e** の4ジョブが自動実行される。
 

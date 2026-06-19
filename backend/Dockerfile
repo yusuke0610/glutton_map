@@ -8,5 +8,5 @@ RUN CGO_ENABLED=0 go build -o /app/server ./cmd/server
 FROM scratch
 COPY --from=build /app/server /app/server
 WORKDIR /app
-EXPOSE 8000
+EXPOSE 8001
 ENTRYPOINT ["/app/server"]

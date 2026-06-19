@@ -18,25 +18,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 すべて `nix develop` のシェル内で実行する（`go` / `bun` は PATH になく nix が供給）。flake はファイルが git に **追跡されている**必要があるため、新規ファイルは `git add` してから nix コマンドを叩く（コミットは不要）。
 
-```bash
-nix develop
+開発タスク（型生成・ビルド・起動・コンテナ・テスト・Lint）はすべて **`Makefile` に定義**してある。
+`nix develop` のシェル内で `make help` を実行するとターゲット一覧が出る。**個別コマンドを直接叩かず、必ず Makefile 経由で実行する**（README にも個別コマンドは書かない）。
 
-# バックエンド: 型生成 → ビルド
-cd backend && go generate ./... && go build ./...
-
-# ローカル起動（既定 :8000、PORT env で変更可）
-LIBSQL_URL=file:./data/pins.db go run ./cmd/server
-curl http://localhost:8000/api/pins
-
-# フロント: 型生成 → 開発サーバ / ビルド
-cd web
-bunx openapi-typescript ../backend/openapi.yaml -o src/types.gen.ts
-bun install && bun run dev      # localhost:5173
-bun run build                   # tsc + vite（型チェック込み）
-
-# コンテナで API 起動
-docker compose up -d            # localhost:8000
-```
+主なターゲット: `gen`（型生成）/ `build` / `run`（API :8001）/ `up`・`down`（コンテナ）/ `dev`（フロント :5174）。テスト・Lint は次節と `make help` を参照。
 
 ### テスト
 
@@ -54,7 +39,7 @@ make lint-web      # フロント eslint（cd web && bun run lint）
 
 - **backend**: Go 標準 `testing`（`-race`/`-count=1`）＋ **golangci-lint**（`backend/.golangci.yml`）。リポジトリ層は `t.TempDir()` の実 SQLite で結合テスト、HTTP 契約は `httptest` で `/api/pins` を検証する。
 - **frontend**: **vitest**（`web/src/*.test.ts`）でロジックを単体テスト、**eslint**（flat config: `web/eslint.config.js`）で静的検査。
-- **E2E**: **Playwright**（`web/e2e/*.spec.ts`、`web/playwright.config.ts`）。backend(:8000)+frontend(:5173)を webServer で起動し、地図がピンを取得・描画するまでを通す。vitest が `*.spec.ts` を拾わないよう vitest の `include` は `src/**/*.test.ts` に限定。
+- **E2E**: **Playwright**（`web/e2e/*.spec.ts`、`web/playwright.config.ts`）。backend(:8001)+frontend(:5174)を webServer で起動し、地図がピンを取得・描画するまでを通す。vitest が `*.spec.ts` を拾わないよう vitest の `include` は `src/**/*.test.ts` に限定。
 - CI（`.github/workflows/ci.yml`）の PR で **backend-test / backend-lint / web-test / e2e** の4ジョブが自動実行される。
 
 ## アーキテクチャ
@@ -67,7 +52,7 @@ backend/
   internal/api/         # gen.go(生成: StrictServerInterface) + handler.go(実装)
   internal/pin/         # pin.go(ドメイン) + repository.go(DBを知る唯一の場所/seam)
   internal/db/seed.go   # 重心+ゆらぎで pins 投入。DB空のとき起動時に流す
-  cmd/server/main.go    # Gin + CORS(5173) + seed + NewStrictHandler でラップして登録
+  cmd/server/main.go    # Gin + CORS(5174) + seed + NewStrictHandler でラップして登録
 web/
   src/{App.tsx,api.ts,types.gen.ts}  # MapLibre heatmap。api.ts は生成型 components["schemas"][...] を参照
 ```

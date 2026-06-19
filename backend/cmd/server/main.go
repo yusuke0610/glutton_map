@@ -40,7 +40,7 @@ func main() {
 
 	// 許可するフロントのオリジン。環境変数 CORS_ALLOW_ORIGINS（カンマ区切り）で
 	// 上書きでき、未設定ならローカル開発の既定値を使う。
-	allowOrigins := []string{"http://localhost:5173"}
+	allowOrigins := []string{"http://localhost:5174"}
 	if v := os.Getenv("CORS_ALLOW_ORIGINS"); v != "" {
 		allowOrigins = strings.Split(v, ",")
 	}
@@ -60,7 +60,7 @@ func main() {
 	h := api.NewStrictHandler(api.NewHandler(repo), nil)
 	api.RegisterHandlers(router, h)
 
-	addr := ":8000"
+	addr := ":8001"
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port
 	}

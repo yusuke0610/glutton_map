@@ -58,15 +58,15 @@ lint-backend:
 lint-web:
 	cd web && bun install && bun run lint
 
-## run: API をローカル起動（:8000、PORT env で変更可）
+## run: API をローカル起動（:8001、PORT env で変更可）
 run:
 	cd backend && LIBSQL_URL=file:./data/pins.db go run ./cmd/server
 
-## dev: フロント開発サーバ（localhost:5173）
+## dev: フロント開発サーバ（localhost:5174）
 dev:
 	cd web && bun install && bun run dev
 
-## up: docker compose で API 起動（localhost:8000）
+## up: docker compose で API 起動（localhost:8001）
 up:
 	docker compose up -d --build
 

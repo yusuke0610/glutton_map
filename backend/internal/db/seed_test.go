@@ -92,6 +92,9 @@ func TestSeed_Countエラーに文脈を付与する(t *testing.T) {
 	repo := &failRepo{failCount: true, err: wantErr}
 
 	err := Seed(context.Background(), repo)
+	if err == nil {
+		t.Fatal("err = nil, want エラー")
+	}
 	if !errors.Is(err, wantErr) {
 		t.Errorf("err = %v, want %v を包む", err, wantErr)
 	}
@@ -105,6 +108,9 @@ func TestSeed_Insertエラーに文脈を付与する(t *testing.T) {
 	repo := &failRepo{failInsert: true, err: wantErr}
 
 	err := Seed(context.Background(), repo)
+	if err == nil {
+		t.Fatal("err = nil, want エラー")
+	}
 	if !errors.Is(err, wantErr) {
 		t.Errorf("err = %v, want %v を包む", err, wantErr)
 	}

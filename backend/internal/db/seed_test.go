@@ -2,6 +2,8 @@ package db
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
@@ -16,6 +18,27 @@ func (m *memRepo) GetPins(ctx context.Context) ([]pin.Pin, error) { return m.pin
 func (m *memRepo) Count(ctx context.Context) (int, error)         { return len(m.pins), nil }
 func (m *memRepo) Insert(ctx context.Context, p pin.Pin) error {
 	m.pins = append(m.pins, p)
+	return nil
+}
+
+// failRepo は指定した操作でエラーを返すフェイク。エラーの文脈付与を検証する。
+type failRepo struct {
+	failCount  bool
+	failInsert bool
+	err        error
+}
+
+func (f *failRepo) GetPins(ctx context.Context) ([]pin.Pin, error) { return nil, nil }
+func (f *failRepo) Count(ctx context.Context) (int, error) {
+	if f.failCount {
+		return 0, f.err
+	}
+	return 0, nil
+}
+func (f *failRepo) Insert(ctx context.Context, p pin.Pin) error {
+	if f.failInsert {
+		return f.err
+	}
 	return nil
 }
 
@@ -61,6 +84,38 @@ func TestSeed_既にデータがあれば何もしない(t *testing.T) {
 
 	if len(repo.pins) != 1 {
 		t.Errorf("ピン数 = %d, want 1（投入されないはず）", len(repo.pins))
+	}
+}
+
+func TestSeed_Countエラーに文脈を付与する(t *testing.T) {
+	wantErr := errors.New("db count 失敗")
+	repo := &failRepo{failCount: true, err: wantErr}
+
+	err := Seed(context.Background(), repo)
+	if err == nil {
+		t.Fatal("err = nil, want エラー")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("err = %v, want %v を包む", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "seed") {
+		t.Errorf("err = %q, want に文脈 \"seed\" を含む", err.Error())
+	}
+}
+
+func TestSeed_Insertエラーに文脈を付与する(t *testing.T) {
+	wantErr := errors.New("db insert 失敗")
+	repo := &failRepo{failInsert: true, err: wantErr}
+
+	err := Seed(context.Background(), repo)
+	if err == nil {
+		t.Fatal("err = nil, want エラー")
+	}
+	if !errors.Is(err, wantErr) {
+		t.Errorf("err = %v, want %v を包む", err, wantErr)
+	}
+	if !strings.Contains(err.Error(), "seed") {
+		t.Errorf("err = %q, want に文脈 \"seed\" を含む", err.Error())
 	}
 }
 

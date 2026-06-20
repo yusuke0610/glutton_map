@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
@@ -34,7 +35,7 @@ var seedWeights = map[string]int{
 func Seed(ctx context.Context, repo pin.PinRepository) error {
 	n, err := repo.Count(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("seed 件数確認: %w", err)
 	}
 	if n > 0 {
 		return nil
@@ -51,7 +52,7 @@ func Seed(ctx context.Context, repo pin.PinRepository) error {
 				Lng:        c[1] + (rand.Float64()*0.3 - 0.15),
 			}
 			if err := repo.Insert(ctx, p); err != nil {
-				return err
+				return fmt.Errorf("seed ピン投入: %w", err)
 			}
 		}
 	}

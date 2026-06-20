@@ -2,7 +2,9 @@ package pin
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +18,24 @@ func newTestRepo(t *testing.T) PinRepository {
 		t.Fatalf("NewSQLiteRepository: %v", err)
 	}
 	return repo
+}
+
+func TestNewSQLiteRepository_不正DSNは文脈付きエラー(t *testing.T) {
+	// 通常ファイルを作り、その配下を DB パスに指定して open/AutoMigrate を失敗させる。
+	f := filepath.Join(t.TempDir(), "afile")
+	if err := os.WriteFile(f, []byte("x"), 0o600); err != nil {
+		t.Fatalf("前提のファイル作成に失敗: %v", err)
+	}
+	dsn := "file:" + filepath.Join(f, "x.db") // ファイル配下なのでディレクトリとして開けない
+
+	_, err := NewSQLiteRepository(dsn)
+	if err == nil {
+		t.Fatal("不正 DSN なのにエラーが返らない")
+	}
+	// 接続・マイグレーションどちらの段で落ちても、自前の文脈が付いていること。
+	if !strings.Contains(err.Error(), "DB 接続") && !strings.Contains(err.Error(), "マイグレーション") {
+		t.Errorf("err = %q, want に文脈（\"DB 接続\" か \"マイグレーション\"）を含む", err.Error())
+	}
 }
 
 func TestSQLiteRepository_新規DBは空(t *testing.T) {

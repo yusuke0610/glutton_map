@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
@@ -64,7 +65,14 @@ func TestGetApiPins_repoのエラーを伝播する(t *testing.T) {
 	h := NewHandler(&fakeRepo{err: wantErr})
 
 	_, err := h.GetApiPins(context.Background(), GetApiPinsRequestObject{})
+	if err == nil {
+		t.Fatal("err = nil, want エラー")
+	}
 	if !errors.Is(err, wantErr) {
 		t.Errorf("err = %v, want %v", err, wantErr)
+	}
+	// 元エラーを %w で包みつつ、どの操作で失敗したかの文脈を付与する。
+	if !strings.Contains(err.Error(), "ピン取得") {
+		t.Errorf("err = %q, want に文脈 \"ピン取得\" を含む", err.Error())
 	}
 }

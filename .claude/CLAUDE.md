@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-如月愛マップ — 日本地図（国土地理院 淡色タイル）上に API から取得したピンをヒートマップ描画する縦割り1スライス。ヒーロー指標は `prefecture_count`（人数ではなく「何都道府県に散らばっているか」）。
+glutton_map — 日本地図（国土地理院 淡色タイル）上に API から取得したピンをヒートマップ描画する縦割り1スライス。ヒーロー指標は `prefecture_count`（人数ではなく「何都道府県に散らばっているか」）。
 
 ## 絶対原則
 

@@ -16,7 +16,7 @@
             docker-compose
           ];
           shellHook = ''
-            echo "如月愛マップ: backend=go / web=bun"
+            echo "glutton_map: backend=go / web=bun"
           '';
         };
       });

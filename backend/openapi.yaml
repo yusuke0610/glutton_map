@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: 如月愛マップ API
+  title: glutton_map API
   version: 0.1.0
   description: |
     最小ヒートマップ・スライスの契約。これが唯一の真実（spec-first）。

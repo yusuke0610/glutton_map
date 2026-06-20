@@ -2,6 +2,7 @@ package pin
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/glebarez/sqlite" // pure Go(modernc ベース)の GORM ドライバ。非cgo。
 	"gorm.io/gorm"
@@ -45,10 +46,10 @@ type sqliteRepo struct{ db *gorm.DB }
 func NewSQLiteRepository(dsn string) (PinRepository, error) {
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("DB 接続: %w", err)
 	}
 	if err := db.AutoMigrate(&pinRow{}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("マイグレーション: %w", err)
 	}
 	return &sqliteRepo{db: db}, nil
 }
@@ -56,7 +57,7 @@ func NewSQLiteRepository(dsn string) (PinRepository, error) {
 func (r *sqliteRepo) GetPins(ctx context.Context) ([]Pin, error) {
 	var rows []pinRow
 	if err := r.db.WithContext(ctx).Find(&rows).Error; err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ピン一覧の取得: %w", err)
 	}
 	pins := make([]Pin, 0, len(rows))
 	for _, row := range rows {
@@ -68,12 +69,15 @@ func (r *sqliteRepo) GetPins(ctx context.Context) ([]Pin, error) {
 func (r *sqliteRepo) Count(ctx context.Context) (int, error) {
 	var n int64
 	if err := r.db.WithContext(ctx).Model(&pinRow{}).Count(&n).Error; err != nil {
-		return 0, err
+		return 0, fmt.Errorf("ピン件数の取得: %w", err)
 	}
 	return int(n), nil
 }
 
 func (r *sqliteRepo) Insert(ctx context.Context, p Pin) error {
 	row := rowFromDomain(p)
-	return r.db.WithContext(ctx).Create(&row).Error
+	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
+		return fmt.Errorf("ピンの挿入: %w", err)
+	}
+	return nil
 }

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
 )
@@ -19,7 +20,7 @@ func NewHandler(repo pin.PinRepository) *Handler {
 func (h *Handler) GetApiPins(ctx context.Context, _ GetApiPinsRequestObject) (GetApiPinsResponseObject, error) {
 	pins, err := h.repo.GetPins(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ピン取得: %w", err)
 	}
 
 	weight := 1

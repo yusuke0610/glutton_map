@@ -175,6 +175,7 @@ export default function App() {
       } catch (e) {
         // 開発者向けはフロー追従で発生箇所のログに、ユーザー向けは一元管理の文言を表示。
         logger.error("地図データの読み込みに失敗", e);
+        setTotal(null);
         setError(messages.error.fetchPins);
       }
     });

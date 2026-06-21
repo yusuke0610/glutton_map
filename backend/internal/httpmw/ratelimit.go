@@ -34,6 +34,13 @@ func (l *Limiter) Allow(ip string) bool {
 	defer l.mu.Unlock()
 
 	now := l.now()
+	// クールダウンを過ぎたエントリを掃除し、ローテーションする IP でマップが
+	// 無制限に肥大化するのを防ぐ。件数が少ない前提の素朴な全走査で十分。
+	for k, ts := range l.last {
+		if now.Sub(ts) >= l.interval {
+			delete(l.last, k)
+		}
+	}
 	if last, ok := l.last[ip]; ok && now.Sub(last) < l.interval {
 		return false
 	}

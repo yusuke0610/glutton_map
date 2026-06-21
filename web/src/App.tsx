@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { createPin, fetchPins } from "./api";
+import { counterText, formatCount } from "./counter";
 import { logger } from "./logger";
 import { messages } from "./messages";
 import { mapStyle } from "./mapStyle";
@@ -102,6 +103,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   // 再試行トリガ。値を増やすと useEffect が再実行され map を作り直す。
   const [reloadKey, setReloadKey] = useState(0);
+  // ピン総数（左上のヒーロー表示用）。null = 未取得。
+  const [total, setTotal] = useState<number | null>(null);
 
   // 投稿フォームの状態。
   const [formOpen, setFormOpen] = useState(false);
@@ -167,10 +170,12 @@ export default function App() {
         // ハイブリッド表示: ズームアウト=ヒートマップ（分布）、ズームイン=ピン（個別）。
         map.addLayer(heatmapLayer());
         map.addLayer(pinIconLayer());
+        setTotal(res.total);
         setError(null);
       } catch (e) {
         // 開発者向けはフロー追従で発生箇所のログに、ユーザー向けは一元管理の文言を表示。
         logger.error("地図データの読み込みに失敗", e);
+        setTotal(null);
         setError(messages.error.fetchPins);
       }
     });
@@ -242,11 +247,38 @@ export default function App() {
     <div style={{ position: "relative", height: "100%" }}>
       <div id="map" ref={containerRef} />
 
-      {/* 投稿フォーム（右下のパネル）。閉じている間はトグルボタンのみ。 */}
+      {/* ヒーロー指標（左上）。数字部分だけ赤で強調する（例: 全世界にくいしんぼが◯◯人！）。 */}
+      {total !== null && (
+        <div
+          aria-label={counterText(total)}
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            zIndex: 2,
+            padding: "8px 14px",
+            background: "rgba(255,255,255,0.95)",
+            color: "#d97b3a",
+            borderRadius: 999,
+            fontWeight: "bold",
+            fontSize: 16,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            pointerEvents: "none",
+          }}
+        >
+          {messages.counter.prefix}
+          <span style={{ color: "#e60012" }}>{formatCount(total)}</span>
+          {messages.counter.suffix}
+        </div>
+      )}
+
+      {/* 投稿フォーム（右上のパネル）。閉じている間はトグルボタンのみ。
+          読み込みエラー時は全幅のエラーバナーと被るため非表示にする。 */}
+      {!error && (
       <div
         style={{
           position: "absolute",
-          bottom: 16,
+          top: 16,
           right: 16,
           zIndex: 2,
           width: formOpen ? 280 : "auto",
@@ -364,6 +396,7 @@ export default function App() {
           </form>
         )}
       </div>
+      )}
 
       {error && (
         <div

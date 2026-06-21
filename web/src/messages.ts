@@ -8,6 +8,11 @@ export const messages = {
     fetchPins: "ピンの取得に失敗しました",
     createPin: "ピンの投稿に失敗しました。時間をおいて再度お試しください。",
   },
+  counter: {
+    // 左上のヒーロー表示。総数を prefix と suffix で挟む（例: 世界にくいしんぼ12人！）。
+    prefix: "全世界にくいしんぼが",
+    suffix: "人！",
+  },
   form: {
     title: "ファンマップにピンを立てる",
     open: "ピンを立てる",

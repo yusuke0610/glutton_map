@@ -271,7 +271,9 @@ export default function App() {
         </div>
       )}
 
-      {/* 投稿フォーム（右上のパネル）。閉じている間はトグルボタンのみ。 */}
+      {/* 投稿フォーム（右上のパネル）。閉じている間はトグルボタンのみ。
+          読み込みエラー時は全幅のエラーバナーと被るため非表示にする。 */}
+      {!error && (
       <div
         style={{
           position: "absolute",
@@ -393,6 +395,7 @@ export default function App() {
           </form>
         )}
       </div>
+      )}
 
       {error && (
         <div

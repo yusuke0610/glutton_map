@@ -1,4 +1,4 @@
-# 如月愛マップ — 開発タスク
+# glutton_map — 開発タスク
 # 各ターゲットは `nix develop` のシェル内で実行する（go / bun は nix が供給）。
 # まとめて nix 経由で叩きたいときは: nix develop --command make <target>
 

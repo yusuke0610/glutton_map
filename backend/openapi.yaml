@@ -19,6 +19,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PinsResponse"
+        "500":
+          description: サーバ内部エラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     post:
       operationId: postApiPins
       summary: ファンがピンを1件投稿する（認証なし）
@@ -39,6 +45,12 @@ paths:
                 $ref: "#/components/schemas/Pin"
         "400":
           description: 入力が不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: サーバ内部エラー
           content:
             application/json:
               schema:

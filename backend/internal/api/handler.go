@@ -2,7 +2,7 @@ package api
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"math/rand"
 	"sync"
 	"time"
@@ -30,7 +30,10 @@ func NewHandler(repo pin.PinRepository) *Handler {
 func (h *Handler) GetApiPins(ctx context.Context, _ GetApiPinsRequestObject) (GetApiPinsResponseObject, error) {
 	pins, err := h.repo.GetPins(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ピン取得: %w", err)
+		// 内部エラーは Go の error として上げず、契約上の型付き 500 で返す。
+		// 観測性のため発生箇所で原因をログする。
+		slog.Error("ピン取得に失敗", "error", err)
+		return GetApiPins500JSONResponse{Message: "ピンの取得に失敗しました"}, nil
 	}
 
 	out := make([]Pin, 0, len(pins))
@@ -80,7 +83,8 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 		Comment:    comment,
 	}
 	if err := h.repo.Insert(ctx, p); err != nil {
-		return nil, fmt.Errorf("ピン投稿: %w", err)
+		slog.Error("ピン投稿の保存に失敗", "error", err)
+		return PostApiPins500JSONResponse{Message: "ピンの投稿に失敗しました"}, nil
 	}
 
 	return PostApiPins201JSONResponse(toAPIPin(p)), nil

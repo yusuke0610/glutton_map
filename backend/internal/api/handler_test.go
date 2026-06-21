@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
@@ -156,19 +155,35 @@ func TestPostApiPins_不正入力は400(t *testing.T) {
 	}
 }
 
-func TestGetApiPins_repoのエラーを伝播する(t *testing.T) {
-	wantErr := errors.New("db 接続失敗")
-	h := NewHandler(&fakeRepo{err: wantErr})
+func TestGetApiPins_repoエラーは型付き500を返す(t *testing.T) {
+	h := NewHandler(&fakeRepo{err: errors.New("db 接続失敗")})
 
-	_, err := h.GetApiPins(context.Background(), GetApiPinsRequestObject{})
-	if err == nil {
-		t.Fatal("err = nil, want エラー")
+	resp, err := h.GetApiPins(context.Background(), GetApiPinsRequestObject{})
+	// 内部エラーは Go の error ではなく、契約上の型付き 500 レスポンスで返す。
+	if err != nil {
+		t.Fatalf("err = %v, want nil（型付き500で返すべき）", err)
 	}
-	if !errors.Is(err, wantErr) {
-		t.Errorf("err = %v, want %v", err, wantErr)
+	got, ok := resp.(GetApiPins500JSONResponse)
+	if !ok {
+		t.Fatalf("レスポンス型 = %T, want GetApiPins500JSONResponse", resp)
 	}
-	// 元エラーを %w で包みつつ、どの操作で失敗したかの文脈を付与する。
-	if !strings.Contains(err.Error(), "ピン取得") {
-		t.Errorf("err = %q, want に文脈 \"ピン取得\" を含む", err.Error())
+	if got.Message == "" {
+		t.Error("Message が空。ユーザー向け文言を入れるべき")
+	}
+}
+
+func TestPostApiPins_insert失敗は型付き500を返す(t *testing.T) {
+	repo := &fakeRepo{insertErr: errors.New("db insert 失敗")}
+	h := NewHandler(repo)
+
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname: "ファン", Prefecture: "高知県", City: "高知市",
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err = %v, want nil（型付き500で返すべき）", err)
+	}
+	if _, ok := resp.(PostApiPins500JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want PostApiPins500JSONResponse", resp)
 	}
 }

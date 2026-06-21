@@ -321,6 +321,20 @@ func (response GetApiPins200JSONResponse) VisitGetApiPinsResponse(w http.Respons
 	return err
 }
 
+type GetApiPins500JSONResponse Error
+
+func (response GetApiPins500JSONResponse) VisitGetApiPinsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type PostApiPinsRequestObject struct {
 	Body *PostApiPinsJSONRequestBody
 }
@@ -353,6 +367,20 @@ func (response PostApiPins400JSONResponse) VisitPostApiPinsResponse(w http.Respo
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostApiPins500JSONResponse Error
+
+func (response PostApiPins500JSONResponse) VisitPostApiPinsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 	_, err := buf.WriteTo(w)
 	return err
 }

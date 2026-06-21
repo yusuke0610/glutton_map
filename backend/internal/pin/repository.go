@@ -24,17 +24,27 @@ type pinRow struct {
 	Prefecture string  `gorm:"not null"`
 	Lat        float64 `gorm:"not null"`
 	Lng        float64 `gorm:"not null"`
+	// ファン投稿の表示用フィールド。seed 由来のピンでは空文字。
+	Nickname string `gorm:"not null;default:''"`
+	City     string `gorm:"not null;default:''"`
+	Comment  string `gorm:"not null;default:''"`
 }
 
 // TableName は GORM の複数形化（pin_rows）を抑え、テーブル名を pins に固定する。
 func (pinRow) TableName() string { return "pins" }
 
 func (r pinRow) toDomain() Pin {
-	return Pin{Prefecture: Prefecture(r.Prefecture), Lat: r.Lat, Lng: r.Lng}
+	return Pin{
+		Prefecture: Prefecture(r.Prefecture), Lat: r.Lat, Lng: r.Lng,
+		Nickname: r.Nickname, City: r.City, Comment: r.Comment,
+	}
 }
 
 func rowFromDomain(p Pin) pinRow {
-	return pinRow{Prefecture: string(p.Prefecture), Lat: p.Lat, Lng: p.Lng}
+	return pinRow{
+		Prefecture: string(p.Prefecture), Lat: p.Lat, Lng: p.Lng,
+		Nickname: p.Nickname, City: p.City, Comment: p.Comment,
+	}
 }
 
 // sqliteRepo は glebarez/sqlite を使う唯一の実装。

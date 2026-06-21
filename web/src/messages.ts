@@ -6,5 +6,18 @@
 export const messages = {
   error: {
     fetchPins: "ピンの取得に失敗しました",
+    createPin: "ピンの投稿に失敗しました。時間をおいて再度お試しください。",
+  },
+  form: {
+    title: "ファンマップにピンを立てる",
+    open: "ピンを立てる",
+    close: "閉じる",
+    nickname: "ニックネーム",
+    prefecture: "都道府県",
+    city: "市区町村",
+    comment: "コメント（任意）",
+    submit: "投稿する",
+    submitting: "投稿中…",
+    success: "投稿しました！マップに反映されます。",
   },
 } as const;

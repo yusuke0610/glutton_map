@@ -12,6 +12,7 @@ import (
 
 	"github.com/kisaragi-ai-map/backend/internal/api"
 	"github.com/kisaragi-ai-map/backend/internal/db"
+	"github.com/kisaragi-ai-map/backend/internal/httpmw"
 	"github.com/kisaragi-ai-map/backend/internal/logger"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
 )
@@ -32,10 +33,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 起動時、DB が空なら seed を流す。
-	if err := db.Seed(context.Background(), repo); err != nil {
-		log.Error("seed", "error", err)
-		os.Exit(1)
+	// 初期ダミーデータの seed は既定で無効（実データ運用に移行したため）。
+	// SEED_ON_START=true のときだけ DB が空なら投入する（E2E など用途限定）。
+	if os.Getenv("SEED_ON_START") == "true" {
+		if err := db.Seed(context.Background(), repo); err != nil {
+			log.Error("seed", "error", err)
+			os.Exit(1)
+		}
 	}
 
 	// 許可するフロントのオリジン。環境変数 CORS_ALLOW_ORIGINS（カンマ区切り）で
@@ -51,10 +55,14 @@ func main() {
 	router.Use(gin.Recovery(), requestLogger(log))
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: allowOrigins,
-		AllowMethods: []string{"GET"},
+		AllowMethods: []string{"GET", "POST"},
 		AllowHeaders: []string{"Origin", "Content-Type"},
 		MaxAge:       12 * time.Hour,
 	}))
+
+	// 投稿(POST)のスパム対策: IP 単位のクールダウン。認証なしの軽い濫用対策。
+	limiter := httpmw.NewLimiter(3 * time.Second)
+	router.Use(limiter.Middleware("POST"))
 
 	// strict-server: NewStrictHandler でラップしてから登録する。
 	h := api.NewStrictHandler(api.NewHandler(repo), nil)

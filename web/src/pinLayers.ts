@@ -8,6 +8,8 @@ import type {
 export const PINS_SOURCE_ID = "pins";
 // ピン上部に載せるアイコン画像の id（App.tsx で addImage。今はプレースホルダ）。
 export const PIN_ICON_IMAGE = "pin-icon";
+// ピン symbol レイヤーの id。クリックでポップアップを出すため App.tsx から参照する。
+export const PIN_ICON_LAYER_ID = "pins-icon";
 
 // ハイブリッドの切り替えズーム。
 // これ未満 = ヒートマップ（分布が見える）、これ以上 = 食いしんboy ピン（個別の場所）。
@@ -73,7 +75,7 @@ export function heatmapLayer(): HeatmapLayerSpecification {
 // 切り替えズームから現れる、食いしんboy アイコン付きピンの symbol レイヤー。
 export function pinIconLayer(): SymbolLayerSpecification {
   return {
-    id: "pins-icon",
+    id: PIN_ICON_LAYER_ID,
     type: "symbol",
     source: PINS_SOURCE_ID,
     minzoom: PIN_TRANSITION_ZOOM,

@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { fetchPins } from "./api";
+import { createPin, fetchPins } from "./api";
 import { logger } from "./logger";
 import { messages } from "./messages";
 import { mapStyle } from "./mapStyle";
+import { PREFECTURES, type Prefecture } from "./prefectures";
+import { popupHTML } from "./popup";
 import {
   heatmapLayer,
   PIN_ICON_IMAGE,
+  PIN_ICON_LAYER_ID,
   PINS_SOURCE_ID,
   pinIconLayer,
 } from "./pinLayers";
@@ -57,12 +60,60 @@ function createPinIcon(): { image: ImageData; options: { pixelRatio: number } } 
   };
 }
 
+// 投稿フォームの共通スタイル。
+const panelButtonStyle: React.CSSProperties = {
+  background: "#d97b3a",
+  color: "#fff",
+  border: "none",
+  borderRadius: 8,
+  padding: "10px 14px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+const labelStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: 13,
+  color: "#333",
+};
+const inputStyle: React.CSSProperties = {
+  padding: "6px 8px",
+  borderRadius: 6,
+  border: "1px solid #ccc",
+  font: "inherit",
+};
+// 罰（×）の閉じるボタン。テキストではなくアイコン表示にする。
+const closeButtonStyle: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: "#666",
+  fontSize: 20,
+  lineHeight: 1,
+  cursor: "pointer",
+  padding: 0,
+  width: 24,
+  height: 24,
+};
+
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   // ユーザー向けエラー文言（null = エラーなし）。
   const [error, setError] = useState<string | null>(null);
   // 再試行トリガ。値を増やすと useEffect が再実行され map を作り直す。
   const [reloadKey, setReloadKey] = useState(0);
+
+  // 投稿フォームの状態。
+  const [formOpen, setFormOpen] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [prefecture, setPrefecture] = useState<Prefecture | "">("");
+  const [city, setCity] = useState("");
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  // 投稿結果の通知（成功 or 失敗）。
+  const [formNotice, setFormNotice] = useState<
+    { kind: "success" | "error"; text: string } | null
+  >(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -97,7 +148,14 @@ export default function App() {
           features: res.pins.map((p) => ({
             type: "Feature",
             geometry: { type: "Point", coordinates: [p.lng, p.lat] },
-            properties: { weight: p.weight ?? 1 },
+            properties: {
+              weight: p.weight ?? 1,
+              // ポップアップ表示用。seed 由来のピンは空文字。
+              prefecture: p.prefecture ?? "",
+              nickname: p.nickname ?? "",
+              city: p.city ?? "",
+              comment: p.comment ?? "",
+            },
           })),
         };
         // ピンアイコン（プレースホルダ）を登録。
@@ -117,6 +175,32 @@ export default function App() {
       }
     });
 
+    // ピンをクリックすると投稿内容をポップアップ表示する（ズームイン時のみピンが出る）。
+    const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: true });
+    map.on("click", PIN_ICON_LAYER_ID, (e) => {
+      const f = e.features?.[0];
+      if (!f) return;
+      const props = f.properties ?? {};
+      const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates;
+      popup
+        .setLngLat([lng, lat])
+        .setHTML(
+          popupHTML({
+            nickname: props.nickname || undefined,
+            prefecture: props.prefecture || undefined,
+            city: props.city || undefined,
+            comment: props.comment || undefined,
+          }),
+        )
+        .addTo(map);
+    });
+    map.on("mouseenter", PIN_ICON_LAYER_ID, () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", PIN_ICON_LAYER_ID, () => {
+      map.getCanvas().style.cursor = "";
+    });
+
     return () => map.remove();
   }, [reloadKey]);
 
@@ -126,9 +210,161 @@ export default function App() {
     setReloadKey((k) => k + 1);
   };
 
+  // 投稿: createPin で送信し、成功したらマップを再取得して新しいピンを反映する。
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prefecture || submitting) return;
+    setSubmitting(true);
+    setFormNotice(null);
+    try {
+      await createPin({
+        nickname,
+        prefecture,
+        city,
+        comment: comment || undefined,
+      });
+      setFormNotice({ kind: "success", text: messages.form.success });
+      // 入力をリセットし、マップを作り直して投稿を反映する。
+      setNickname("");
+      setPrefecture("");
+      setCity("");
+      setComment("");
+      setReloadKey((k) => k + 1);
+    } catch (err) {
+      logger.error("ピンの投稿に失敗", err);
+      setFormNotice({ kind: "error", text: messages.error.createPin });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div style={{ position: "relative", height: "100%" }}>
       <div id="map" ref={containerRef} />
+
+      {/* 投稿フォーム（右下のパネル）。閉じている間はトグルボタンのみ。 */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 16,
+          right: 16,
+          zIndex: 2,
+          width: formOpen ? 280 : "auto",
+        }}
+      >
+        {!formOpen ? (
+          <button
+            type="button"
+            onClick={() => setFormOpen(true)}
+            style={panelButtonStyle}
+          >
+            {messages.form.open}
+          </button>
+        ) : (
+          <form
+            onSubmit={handleSubmit}
+            aria-label={messages.form.title}
+            style={{
+              background: "rgba(255,255,255,0.97)",
+              borderRadius: 10,
+              padding: 16,
+              boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <strong>{messages.form.title}</strong>
+              <button
+                type="button"
+                aria-label={messages.form.close}
+                onClick={() => setFormOpen(false)}
+                style={closeButtonStyle}
+              >
+                ×
+              </button>
+            </div>
+
+            <label style={labelStyle}>
+              {messages.form.nickname}
+              <input
+                type="text"
+                required
+                maxLength={30}
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              {messages.form.prefecture}
+              <select
+                required
+                value={prefecture}
+                onChange={(e) => setPrefecture(e.target.value as Prefecture)}
+                style={inputStyle}
+              >
+                <option value="" disabled>
+                  ―
+                </option>
+                {PREFECTURES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={labelStyle}>
+              {messages.form.city}
+              <input
+                type="text"
+                required
+                maxLength={50}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              {messages.form.comment}
+              <textarea
+                maxLength={200}
+                rows={3}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                style={inputStyle}
+              />
+            </label>
+
+            <button type="submit" disabled={submitting} style={panelButtonStyle}>
+              {submitting ? messages.form.submitting : messages.form.submit}
+            </button>
+
+            {formNotice && (
+              <div
+                role={formNotice.kind === "error" ? "alert" : "status"}
+                style={{
+                  color: formNotice.kind === "error" ? "#a6471a" : "#1a7a3a",
+                  fontSize: 13,
+                }}
+              >
+                {formNotice.text}
+              </div>
+            )}
+          </form>
+        )}
+      </div>
+
       {error && (
         <div
           role="alert"

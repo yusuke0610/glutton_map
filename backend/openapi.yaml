@@ -19,6 +19,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PinsResponse"
+        "500":
+          description: サーバ内部エラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: postApiPins
+      summary: ファンがピンを1件投稿する（認証なし）
+      description: |
+        座標はサーバが都道府県の重心+ゆらぎで生成する。クライアントから lat/lng は受け取らない。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePinRequest"
+      responses:
+        "201":
+          description: 作成されたピン
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pin"
+        "400":
+          description: 入力が不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: サーバ内部エラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     Pin:
@@ -39,6 +75,42 @@ components:
           type: integer
           default: 1
           description: ヒートの重み。最小スライスでは件数で密度を表現するため通常 1。
+        nickname:
+          type: string
+          description: 投稿者のニックネーム。seed 由来のピンでは空。
+        city:
+          type: string
+          description: 市区町村（表示用）。seed 由来のピンでは空。
+        comment:
+          type: string
+          description: 一言コメント。seed 由来のピンでは空。
+    CreatePinRequest:
+      type: object
+      required: [nickname, prefecture, city]
+      properties:
+        nickname:
+          type: string
+          minLength: 1
+          maxLength: 30
+          description: 投稿者のニックネーム。
+        prefecture:
+          $ref: "#/components/schemas/Prefecture"
+        city:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: 市区町村（表示用テキスト。座標には使わない）。
+        comment:
+          type: string
+          maxLength: 200
+          description: 一言コメント（任意）。
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: ユーザー向けエラーメッセージ。
     PinsResponse:
       type: object
       required: [pins, prefecture_count, total]

@@ -90,6 +90,32 @@ func TestSQLiteRepository_InsertしたピンをGetPinsで取り出せる(t *test
 	}
 }
 
+func TestSQLiteRepository_投稿フィールドも往復する(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+
+	want := Pin{
+		Prefecture: "高知県", Lat: 33.56, Lng: 133.53,
+		Nickname: "如月ファン", City: "高知市", Comment: "ここの唐揚げ弁当が最高",
+	}
+	if err := repo.Insert(ctx, want); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	pins, err := repo.GetPins(ctx)
+	if err != nil {
+		t.Fatalf("GetPins: %v", err)
+	}
+	if len(pins) != 1 {
+		t.Fatalf("len(GetPins) = %d, want 1", len(pins))
+	}
+	got := pins[0]
+	if got.Nickname != want.Nickname || got.City != want.City || got.Comment != want.Comment {
+		t.Errorf("GetPins[0] = %+v, want nickname/city/comment = %q/%q/%q",
+			got, want.Nickname, want.City, want.Comment)
+	}
+}
+
 func TestSQLiteRepository_複数Insertを全件返す(t *testing.T) {
 	repo := newTestRepo(t)
 	ctx := context.Background()

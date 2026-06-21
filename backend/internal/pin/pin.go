@@ -4,10 +4,15 @@ package pin
 type Prefecture string
 
 // Pin は地図上の1点。最小スライスでは緯度経度はただのカラム。
+// Nickname/City/Comment はファン投稿で入る表示用の情報（ポップアップで見せる）。
+// seed 由来のピンではこれらは空文字になる。
 type Pin struct {
 	Prefecture Prefecture
 	Lat        float64
 	Lng        float64
+	Nickname   string
+	City       string
+	Comment    string
 }
 
 // Summary はヒーロー指標の集計結果。

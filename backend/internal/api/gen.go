@@ -166,10 +166,39 @@ func (e Prefecture) Valid() bool {
 	}
 }
 
+// CreatePinRequest defines model for CreatePinRequest.
+type CreatePinRequest struct {
+	// City 市区町村（表示用テキスト。座標には使わない）。
+	City string `json:"city"`
+
+	// Comment 一言コメント（任意）。
+	Comment *string `json:"comment,omitempty"`
+
+	// Nickname 投稿者のニックネーム。
+	Nickname string `json:"nickname"`
+
+	// Prefecture 標準47都道府県
+	Prefecture Prefecture `json:"prefecture"`
+}
+
+// Error defines model for Error.
+type Error struct {
+	// Message ユーザー向けエラーメッセージ。
+	Message string `json:"message"`
+}
+
 // Pin defines model for Pin.
 type Pin struct {
-	Lat float64 `json:"lat"`
-	Lng float64 `json:"lng"`
+	// City 市区町村（表示用）。seed 由来のピンでは空。
+	City *string `json:"city,omitempty"`
+
+	// Comment 一言コメント。seed 由来のピンでは空。
+	Comment *string `json:"comment,omitempty"`
+	Lat     float64 `json:"lat"`
+	Lng     float64 `json:"lng"`
+
+	// Nickname 投稿者のニックネーム。seed 由来のピンでは空。
+	Nickname *string `json:"nickname,omitempty"`
 
 	// Prefecture 標準47都道府県
 	Prefecture Prefecture `json:"prefecture"`
@@ -192,11 +221,17 @@ type PinsResponse struct {
 // Prefecture 標準47都道府県
 type Prefecture string
 
+// PostApiPinsJSONRequestBody defines body for PostApiPins for application/json ContentType.
+type PostApiPinsJSONRequestBody = CreatePinRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ヒートマップ用のピン一覧を取得する
 	// (GET /api/pins)
 	GetApiPins(c *gin.Context)
+	// ファンがピンを1件投稿する（認証なし）
+	// (POST /api/pins)
+	PostApiPins(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -219,6 +254,19 @@ func (siw *ServerInterfaceWrapper) GetApiPins(c *gin.Context) {
 	}
 
 	siw.Handler.GetApiPins(c)
+}
+
+// PostApiPins operation middleware
+func (siw *ServerInterfaceWrapper) PostApiPins(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.PostApiPins(c)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -249,6 +297,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 	}
 
 	router.GET(options.BaseURL+"/api/pins", wrapper.GetApiPins)
+	router.POST(options.BaseURL+"/api/pins", wrapper.PostApiPins)
 }
 
 type GetApiPinsRequestObject struct {
@@ -272,11 +321,78 @@ func (response GetApiPins200JSONResponse) VisitGetApiPinsResponse(w http.Respons
 	return err
 }
 
+type GetApiPins500JSONResponse Error
+
+func (response GetApiPins500JSONResponse) VisitGetApiPinsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostApiPinsRequestObject struct {
+	Body *PostApiPinsJSONRequestBody
+}
+
+type PostApiPinsResponseObject interface {
+	VisitPostApiPinsResponse(w http.ResponseWriter) error
+}
+
+type PostApiPins201JSONResponse Pin
+
+func (response PostApiPins201JSONResponse) VisitPostApiPinsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostApiPins400JSONResponse Error
+
+func (response PostApiPins400JSONResponse) VisitPostApiPinsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PostApiPins500JSONResponse Error
+
+func (response PostApiPins500JSONResponse) VisitPostApiPinsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ヒートマップ用のピン一覧を取得する
 	// (GET /api/pins)
 	GetApiPins(ctx context.Context, request GetApiPinsRequestObject) (GetApiPinsResponseObject, error)
+	// ファンがピンを1件投稿する（認証なし）
+	// (POST /api/pins)
+	PostApiPins(ctx context.Context, request PostApiPinsRequestObject) (PostApiPinsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx *gin.Context, request any) (any, error)
@@ -353,6 +469,37 @@ func (sh *strictHandler) GetApiPins(ctx *gin.Context) {
 		sh.options.HandlerErrorFunc(ctx, err)
 	} else if validResponse, ok := response.(GetApiPinsResponseObject); ok {
 		if err := validResponse.VisitGetApiPinsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PostApiPins operation middleware
+func (sh *strictHandler) PostApiPins(ctx *gin.Context) {
+	var request PostApiPinsRequestObject
+
+	var body PostApiPinsJSONRequestBody
+	if err := ctx.ShouldBindJSON(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(ctx, err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PostApiPins(ctx, request.(PostApiPinsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostApiPins")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(PostApiPinsResponseObject); ok {
+		if err := validResponse.VisitPostApiPinsResponse(ctx.Writer); err != nil {
 			sh.options.ResponseErrorHandlerFunc(ctx, err)
 		}
 	} else if response != nil {

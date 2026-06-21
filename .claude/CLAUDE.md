@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-glutton_map — 日本地図（国土地理院 淡色タイル）上に API から取得したピンをヒートマップ描画する縦割り1スライス。ヒーロー指標は `prefecture_count`（人数ではなく「何都道府県に散らばっているか」）。
+glutton_map — 日本地図上に API から取得したピンをヒートマップ／ピンで描画する縦割りスライス。ヒーロー指標は `prefecture_count`（人数ではなく「何都道府県に散らばっているか」）。ファンは認証なしでピンを投稿でき（`POST /api/pins`：ニックネーム/市区町村/コメント）、座標はサーバが都道府県の重心+ゆらぎで生成する（正確な現在地は受け取らない）。
 
 ## 絶対原則
 
 - **spec-first / 単一の真実**: `backend/openapi.yaml` が唯一の契約。Go サーバ型は oapi-codegen、フロント TS 型は openapi-typescript で **同じ yaml から生成する**。**両側の型を手書きしてはいけない**（`internal/api/gen.go` と `web/src/types.gen.ts` は生成物）。
 - **DB の隔離**: `database/sql` とドライバ（`modernc.org/sqlite`）を import してよいのは `backend/internal/pin/repository.go` **だけ**。他層は `PinRepository` interface 越しにアクセスする。`grep -rl "database/sql" internal cmd` が1ファイルに収まることを保つ。
-- **最小スコープ**: スコープ外（実装しない）= LLMモデレーション / Turnstile / 通報 / PostGIS等の高度集計 / クラスタリング / ピン個別ポップアップ / go-libsql(cgo)実装 / `weight` カラム。緯度経度はただのカラム、密度は件数で表現する。
+- **最小スコープ**: スコープ外（実装しない）= LLMモデレーション / Turnstile / 通報 / PostGIS等の高度集計 / クラスタリング / 写真・画像保存（フェーズ2） / go-libsql(cgo)実装 / `weight` カラム。緯度経度はただのカラム、密度は件数で表現する。ピン投稿（ニックネーム/市区町村/コメント）と、ピンクリックでの個別ポップアップ表示は実装済み（フェーズ1）。
 - **TDD 遵守**: 機能追加・変更は必ず **TDD（Red→Green→Refactor）** で進める。まず失敗するテストを書いて赤を確認し、最小実装で緑にし、緑を保ったままリファクタする。**実装を先に書いてはいけない**。テストは `make test` 経由で実行する（詳細は「テスト」節）。
 - **push / PR は勝手にやらない**: `git push` と PR 作成（`gh pr create` 等）は、ユーザーが明示的に指示したときだけ実行する。ローカルでの commit までは進めてよいが、リモートへ反映する操作は必ず事前に許可を取る。
 
@@ -51,13 +51,13 @@ backend/
   tools.go              # oapi-codegen を go.mod に固定（//go:build tools）
   internal/api/         # gen.go(生成: StrictServerInterface) + handler.go(実装)
   internal/pin/         # pin.go(ドメイン) + repository.go(DBを知る唯一の場所/seam)
-  internal/db/seed.go   # 重心+ゆらぎで pins 投入。DB空のとき起動時に流す
-  cmd/server/main.go    # Gin + CORS(5174) + seed + NewStrictHandler でラップして登録
+  internal/db/seed.go   # 重心+ゆらぎで pins 投入（DB空のときのみ）。既定で無効、SEED_ON_START=true でのみ実行
+  cmd/server/main.go    # Gin + CORS(5174) + (任意で seed) + NewStrictHandler でラップして登録
 web/
   src/{App.tsx,api.ts,types.gen.ts}  # MapLibre heatmap。api.ts は生成型 components["schemas"][...] を参照
 ```
 
-データの流れ: `main` が DSN(`LIBSQL_URL`)で `NewSQLiteRepository` → 空なら `db.Seed` → `Handler.GetApiPins` が repo から取得し `prefecture_count`(distinct)/`total` を集計 → strict-server の型付きレスポンス `GetApiPins200JSONResponse` で返す。
+データの流れ: `main` が DSN(`LIBSQL_URL`)で `NewSQLiteRepository` → （`SEED_ON_START=true` のときだけ空なら `db.Seed`。実データ運用では既定で無効）→ `Handler.GetApiPins` が repo から取得し `prefecture_count`(distinct)/`total` を集計 → strict-server の型付きレスポンス `GetApiPins200JSONResponse` で返す。
 
 ### コード生成の要点
 

@@ -271,7 +271,10 @@ export default function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // 市区町村は候補から選択（municipalityCode あり）されていないと投稿できない。
-    if (!canSubmitPin({ prefecture, municipalityCode, submitting })) return;
+    // canSubmitPin は prefecture !== "" も確認するが、tsc に prefecture を絞り込ませる
+    // ため明示の早期 return も置く（これがないと createPin に "" が渡りうると判定される）。
+    if (!canSubmitPin({ prefecture, municipalityCode, submitting }) || prefecture === "")
+      return;
     setSubmitting(true);
     setFormNotice(null);
     try {

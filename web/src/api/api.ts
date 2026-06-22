@@ -1,5 +1,5 @@
 import type { components } from "./types.gen";
-import { logger } from "./logger";
+import { logger } from "../lib/logger";
 
 export type PinsResponse = components["schemas"]["PinsResponse"];
 export type Pin = components["schemas"]["Pin"];

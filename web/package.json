@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "gen": "openapi-typescript ../backend/openapi.yaml -o src/types.gen.ts",
+    "gen": "openapi-typescript ../backend/openapi.yaml -o src/api/types.gen.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

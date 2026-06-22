@@ -8,7 +8,7 @@ tools/municipalities/node_modules/
 # web
 web/node_modules/
 web/dist/
-web/src/types.gen.ts
+web/src/api/types.gen.ts
 # Playwright の成果物
 web/playwright-report/
 web/test-results/

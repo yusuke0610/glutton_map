@@ -9,7 +9,7 @@ export default tseslint.config(
   {
     ignores: [
       "dist",
-      "src/types.gen.ts",
+      "src/api/types.gen.ts",
       "playwright-report",
       "test-results",
     ],

@@ -17,9 +17,9 @@ gen: gen-backend gen-web
 gen-backend:
 	cd backend && go generate ./...
 
-## gen-web: openapi-typescript で web/src/types.gen.ts を生成
+## gen-web: openapi-typescript で web/src/api/types.gen.ts を生成
 gen-web:
-	cd web && bunx openapi-typescript ../backend/openapi.yaml -o src/types.gen.ts
+	cd web && bunx openapi-typescript ../backend/openapi.yaml -o src/api/types.gen.ts
 
 ## gen-kana: 総務省CSVから KANA_CSV(code,kana) を生成（要 KANA_SRC=全国版.csv,政令市区版.csv）
 gen-kana:

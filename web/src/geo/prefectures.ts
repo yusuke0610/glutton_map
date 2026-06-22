@@ -1,4 +1,4 @@
-import type { components } from "./types.gen";
+import type { components } from "../api/types.gen";
 
 export type Prefecture = components["schemas"]["Prefecture"];
 

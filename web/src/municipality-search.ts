@@ -21,6 +21,7 @@ export function searchMunicipalities(
   query: string,
   limit = 20,
 ): Municipality[] {
+  if (limit <= 0) return [];
   const nq = normalize(query);
   if (nq === "") return [];
   const hq = toHiragana(nq);

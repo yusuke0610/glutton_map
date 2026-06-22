@@ -109,6 +109,11 @@ func ParseGeoJSON(data []byte) (*Index, error) {
 		} else {
 			m.Rep = representativePoint(mp, m.bbox)
 		}
+		// 代表点が境界外（フォールバックのグリッド走査が内部点を取り逃した／退化ポリゴン等）なら、
+		// SamplePoint が境界外の点を返さないようデータ不正として弾く。
+		if !mp.Contains(m.Rep) {
+			return nil, fmt.Errorf("%s の代表点が境界外です", f.Properties.Code)
+		}
 		ix.byCode[m.Code] = m
 	}
 	return ix, nil

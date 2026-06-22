@@ -23,6 +23,10 @@ describe("searchMunicipalities", () => {
     expect(names(searchMunicipalities(LIST, "東京都", "ネリマ"))).toEqual(["練馬区"]);
   });
 
+  it("半角カタカナ入力もヒットする", () => {
+    expect(names(searchMunicipalities(LIST, "東京都", "ﾈﾘﾏ"))).toEqual(["練馬区"]);
+  });
+
   it("選択中の都道府県で絞り込む", () => {
     // 高知県を選んでいれば東京の練馬は出ない
     expect(searchMunicipalities(LIST, "高知県", "練馬")).toEqual([]);
@@ -38,5 +42,9 @@ describe("searchMunicipalities", () => {
 
   it("limit で件数を制限する", () => {
     expect(searchMunicipalities(LIST, "東京都", "区", 1)).toHaveLength(1);
+  });
+
+  it("limit が 0 以下なら候補なし", () => {
+    expect(searchMunicipalities(LIST, "東京都", "区", 0)).toEqual([]);
   });
 });

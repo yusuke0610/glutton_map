@@ -439,6 +439,13 @@ export default function App() {
                             setMunicipalityCode(m.code);
                             setCityFocused(false);
                           }}
+                          // キーボード操作(Enter/Space)は click で発火するため、code 未設定で
+                          // 都道府県フォールバックに落ちないよう同じ選択処理を割り当てる。
+                          onClick={() => {
+                            setCity(m.name);
+                            setMunicipalityCode(m.code);
+                            setCityFocused(false);
+                          }}
                           style={suggestionItemStyle}
                         >
                           {m.name}

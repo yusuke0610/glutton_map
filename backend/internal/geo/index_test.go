@@ -83,6 +83,24 @@ func TestSamplePointUnknownCode(t *testing.T) {
 	}
 }
 
+func TestParseGeoJSONRejectsRepOutside(t *testing.T) {
+	// 共線・面積ゼロの退化ポリゴンは内部点を持たず、フォールバックの代表点も境界外になる。
+	// このとき SamplePoint が境界外の点を ok=true で返さないよう、パース時点で弾く。
+	const degenerate = `{
+	  "type": "FeatureCollection",
+	  "features": [
+	    {
+	      "type": "Feature",
+	      "properties": {"code": "00000", "prefecture": "X", "name": "退化"},
+	      "geometry": {"type": "Polygon", "coordinates": [[[0,0],[1,1],[2,2],[0,0]]]}
+	    }
+	  ]
+	}`
+	if _, err := ParseGeoJSON([]byte(degenerate)); err == nil {
+		t.Fatal("代表点が境界外なのにエラーにならなかった")
+	}
+}
+
 func TestRepresentativePointInside(t *testing.T) {
 	ix := mustParse(t)
 	for _, code := range []string{"13120", "39201"} {

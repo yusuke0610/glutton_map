@@ -80,8 +80,11 @@ const features = [];
 const muni = [];
 for (const f of merged.features) {
   const p = f.properties ?? {};
-  const code = String(p.N03_007 ?? "").trim();
-  if (!code || !f.geometry) continue;
+  // N03_007 を厳密に5桁へ正規化する。数値化で先頭ゼロが落ちた入力(例: "1101")も
+  // padStart で復元し、5桁にならないものは弾く（municipality_code/kana 結合のずれ防止）。
+  let code = String(p.N03_007 ?? "").trim();
+  if (/^\d{1,5}$/.test(code)) code = code.padStart(5, "0");
+  if (!/^\d{5}$/.test(code) || !f.geometry) continue;
   const prefecture = p.N03_001 ?? "";
   // 郡名＋市区町村名＋政令市の区名を連結する（例: 石狩郡当別町 / 八王子市 / 札幌市中央区）。
   const name = `${p.N03_003 ?? ""}${p.N03_004 ?? ""}${p.N03_005 ?? ""}`.trim();
@@ -98,14 +101,19 @@ for (const f of merged.features) {
   muni.push({ code, prefecture, name, kana });
 }
 
-// 重複コードがあれば最後勝ちで畳む（dissolve 済みだが念のため）。
+// 重複コードがあれば最後勝ちで畳む（dissolve 済みだが念のため）。backend/frontend が
+// 重複コードで食い違わないよう、features と muni を同じ基準で dedup・ソートする。
+const featByCode = new Map(features.map((f) => [f.properties.code, f]));
+const featSorted = [...featByCode.values()].sort((a, b) =>
+  a.properties.code.localeCompare(b.properties.code),
+);
 const byCode = new Map(muni.map((m) => [m.code, m]));
 const muniSorted = [...byCode.values()].sort((a, b) => a.code.localeCompare(b.code));
 
 // 3) backend 埋め込み用 geojson を書き出す。
 fs.writeFileSync(
   backendOut,
-  JSON.stringify({ type: "FeatureCollection", features }) + "\n",
+  JSON.stringify({ type: "FeatureCollection", features: featSorted }) + "\n",
 );
 
 // 4) frontend 用 TS を書き出す。

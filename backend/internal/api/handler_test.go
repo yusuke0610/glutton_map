@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"testing"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
@@ -212,6 +213,29 @@ func TestPostApiPins_コード未指定は400(t *testing.T) {
 		Prefecture: "高知県",
 		City:       "高知市",
 		// MunicipalityCode 未指定（候補から選んでいない）→ 拒否。
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("バリデーションエラーは err ではなく 400 で返すべき: %v", err)
+	}
+	if _, ok := resp.(PostApiPins400JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want PostApiPins400JSONResponse", resp)
+	}
+	if len(repo.inserted) != 0 {
+		t.Errorf("inserted = %d件, want 0", len(repo.inserted))
+	}
+}
+
+func TestPostApiPins_縮退モードでもコード未指定は400(t *testing.T) {
+	repo := &fakeRepo{}
+	// 境界データのロードに失敗した縮退モード（muni == nil）を再現する。
+	h := &Handler{repo: repo, rng: rand.New(rand.NewSource(1))}
+
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname:   "ファン",
+		Prefecture: "高知県",
+		City:       "高知市",
+		// MunicipalityCode 未指定。縮退モードでも必須契約を守り 201 で通さない。
 	}}
 	resp, err := h.PostApiPins(context.Background(), req)
 	if err != nil {

@@ -107,6 +107,12 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 // 例外: 同梱の市区町村データのロードに失敗した縮退モード（h.muni == nil、起動時にログ済み）では
 // 検証不能なため、システムを止めないよう都道府県の重心+ゆらぎにフォールバックする。
 func (h *Handler) resolveMunicipality(body *CreatePinRequest) (lat, lng float64, city string, err error) {
+	// municipality_code は必須。候補未選択は縮退モードかどうかに関わらず拒否し、
+	// 縮退モードで空コードが 201 で通って必須契約を破らないようにする。
+	if body.MunicipalityCode == "" {
+		return 0, 0, "", fmt.Errorf("市区町村は候補から選択してください")
+	}
+
 	if h.muni == nil {
 		h.mu.Lock()
 		la, lo, ok := pin.CoordinateFor(pin.Prefecture(body.Prefecture), h.rng)
@@ -118,9 +124,6 @@ func (h *Handler) resolveMunicipality(body *CreatePinRequest) (lat, lng float64,
 		return la, lo, body.City, nil
 	}
 
-	if body.MunicipalityCode == "" {
-		return 0, 0, "", fmt.Errorf("市区町村は候補から選択してください")
-	}
 	m, found := h.muni.Get(body.MunicipalityCode)
 	if !found {
 		return 0, 0, "", fmt.Errorf("市区町村が見つかりません")

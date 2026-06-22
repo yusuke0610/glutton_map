@@ -3,7 +3,7 @@
 # まとめて nix 経由で叩きたいときは: nix develop --command make <target>
 
 .DEFAULT_GOAL := help
-.PHONY: help gen gen-backend gen-web build build-backend build-web \
+.PHONY: help gen gen-backend gen-web gen-kana gen-municipalities build build-backend build-web \
         test test-backend test-web test-e2e lint lint-backend lint-web run dev up down clean
 
 ## help: ターゲット一覧を表示
@@ -20,6 +20,14 @@ gen-backend:
 ## gen-web: openapi-typescript で web/src/types.gen.ts を生成
 gen-web:
 	cd web && bunx openapi-typescript ../backend/openapi.yaml -o src/types.gen.ts
+
+## gen-kana: 総務省CSVから KANA_CSV(code,kana) を生成（要 KANA_SRC=全国版.csv,政令市区版.csv）
+gen-kana:
+	cd tools/municipalities && KANA_SRC=$(KANA_SRC) KANA_OUT=$(KANA_OUT) node prep-kana.mjs
+
+## gen-municipalities: 行政区域(N03)から市区町村データを生成（要 N03_GEOJSON）
+gen-municipalities:
+	cd tools/municipalities && bun install && N03_GEOJSON=$(N03_GEOJSON) SIMPLIFY=$(SIMPLIFY) KANA_CSV=$(KANA_CSV) node generate.mjs
 
 ## build: バックエンド・フロント両方をビルド
 build: build-backend build-web

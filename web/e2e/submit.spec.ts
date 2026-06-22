@@ -19,7 +19,11 @@ async function fillForm(
   await page.getByLabel(messages.form.comment).fill("唐揚げ弁当が最高");
 }
 
-test("投稿するとピンがマップに反映される", async ({ page }) => {
+// 注: 投稿には IP 単位 3 秒のクールダウンがあるため、実 POST するテストは1本に保つ
+//（並列ワーカーで複数が同時 POST すると 429 になる）。この1本で「反映」と「境界内」を両方検証する。
+test("市区町村を候補から選んで投稿するとその境界内にピンが反映される", async ({
+  page,
+}) => {
   await page.goto("/");
   // 初回のピン取得を待つ。
   await page.waitForResponse(
@@ -28,7 +32,12 @@ test("投稿するとピンがマップに反映される", async ({ page }) => 
 
   // 後で自分の投稿を特定できるよう一意なニックネームにする。
   const nickname = `E2E_${Date.now()}`;
-  await fillForm(page, nickname);
+  await page.getByRole("button", { name: messages.form.open }).click();
+  await page.getByLabel(messages.form.nickname).fill(nickname);
+  await page.getByLabel(messages.form.prefecture).selectOption("東京都");
+  // あいまい検索: 「練馬」と打って候補から練馬区を選ぶ。
+  await page.getByLabel(messages.form.city).fill("練馬");
+  await page.getByRole("button", { name: "練馬区" }).click();
 
   const posted = page.waitForResponse(
     (r) => r.url().includes("/api/pins") && r.request().method() === "POST",
@@ -50,6 +59,17 @@ test("投稿するとピンがマップに反映される", async ({ page }) => 
       { timeout: 15_000 },
     )
     .toBe(true);
+
+  // 投稿ピンの座標が練馬区 bbox（同梱データ）内に入ること。
+  const [lng, lat] = (await page.evaluate((nick) => {
+    const feats = window.__map.querySourceFeatures("pins");
+    const f = feats.find((x) => x.properties?.nickname === nick);
+    return (f!.geometry as GeoJSON.Point).coordinates;
+  }, nickname)) as [number, number];
+  expect(lng).toBeGreaterThanOrEqual(139.56);
+  expect(lng).toBeLessThanOrEqual(139.683);
+  expect(lat).toBeGreaterThanOrEqual(35.715);
+  expect(lat).toBeLessThanOrEqual(35.785);
 });
 
 test("投稿失敗時はフォームにエラーを表示する", async ({ page }) => {

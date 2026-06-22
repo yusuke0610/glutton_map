@@ -133,6 +133,65 @@ func TestPostApiPins_投稿が保存され201で返る(t *testing.T) {
 	}
 }
 
+func TestPostApiPins_市区町村コード指定で境界内に生成し正規名称で保存(t *testing.T) {
+	repo := &fakeRepo{}
+	h := NewHandler(repo)
+
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname:         "ねりまファン",
+		Prefecture:       "東京都",
+		City:             "ねりま", // 表記ゆれ。コード指定時は正規名称で上書きされる
+		MunicipalityCode: strptr("13120"),
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("予期しないエラー: %v", err)
+	}
+	created, ok := resp.(PostApiPins201JSONResponse)
+	if !ok {
+		t.Fatalf("レスポンス型が想定外: %T", resp)
+	}
+	// 同梱データの練馬区 bbox（経度139.560〜139.683, 緯度35.715〜35.785）内に入ること。
+	if created.Lng < 139.560 || created.Lng > 139.683 {
+		t.Errorf("Lng = %f, 練馬区bbox外", created.Lng)
+	}
+	if created.Lat < 35.715 || created.Lat > 35.785 {
+		t.Errorf("Lat = %f, 練馬区bbox外", created.Lat)
+	}
+	// 表示用 city は正規名称（練馬区）で保存される。
+	if len(repo.inserted) != 1 || repo.inserted[0].City != "練馬区" {
+		t.Errorf("inserted City = %q, want 練馬区", repo.inserted[0].City)
+	}
+}
+
+func TestPostApiPins_不正なコードは都道府県重心へフォールバック(t *testing.T) {
+	repo := &fakeRepo{}
+	h := NewHandler(repo)
+
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname:         "ファン",
+		Prefecture:       "高知県",
+		City:             "高知市",
+		MunicipalityCode: strptr("00000"), // 存在しないコード
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("予期しないエラー: %v", err)
+	}
+	created, ok := resp.(PostApiPins201JSONResponse)
+	if !ok {
+		t.Fatalf("レスポンス型が想定外: %T", resp)
+	}
+	// フォールバックなので高知県の重心 ±0.15 に入る。
+	if created.Lat < 33.56-0.15 || created.Lat > 33.56+0.15 {
+		t.Errorf("Lat = %f, want 33.56±0.15(フォールバック)", created.Lat)
+	}
+	// フォールバック時は入力 city をそのまま保存。
+	if repo.inserted[0].City != "高知市" {
+		t.Errorf("inserted City = %q, want 高知市", repo.inserted[0].City)
+	}
+}
+
 func TestPostApiPins_不正入力は400(t *testing.T) {
 	repo := &fakeRepo{}
 	h := NewHandler(repo)

@@ -168,11 +168,15 @@ func (e Prefecture) Valid() bool {
 
 // CreatePinRequest defines model for CreatePinRequest.
 type CreatePinRequest struct {
-	// City 市区町村（表示用テキスト。座標には使わない）。
+	// City 市区町村（表示用テキスト）。municipality_code 指定時はサーバが正規名称で上書きする。
 	City string `json:"city"`
 
 	// Comment 一言コメント（任意）。
 	Comment *string `json:"comment,omitempty"`
+
+	// MunicipalityCode 全国地方公共団体コード（市区町村）。指定すると座標をその境界内に生成する。
+	// 未指定／不正なコードのときは都道府県の重心+ゆらぎにフォールバックする。
+	MunicipalityCode *string `json:"municipality_code,omitempty"`
 
 	// Nickname 投稿者のニックネーム。
 	Nickname string `json:"nickname"`

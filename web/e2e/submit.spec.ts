@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { messages } from "../src/messages";
+import { messages } from "../src/lib/messages";
 
 declare global {
   interface Window {

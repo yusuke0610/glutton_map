@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { messages } from "../src/messages";
+import { messages } from "../src/lib/messages";
 
 test("API 失敗時はユーザー向けエラーバナーを表示する", async ({ page }) => {
   // /api/pins を 500 にして取得を失敗させる。

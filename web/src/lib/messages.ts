@@ -4,6 +4,8 @@
 // 発生箇所（例: api.ts）に直接書く。将来 i18n が必要になったら、
 // この構造を react-i18next 等のキー定義へ発展させられる。
 export const messages = {
+  // 画面上部中央に出すアプリのタイトル。
+  title: "914マップ",
   error: {
     fetchPins: "ピンの取得に失敗しました",
     createPin: "ピンの投稿に失敗しました。時間をおいて再度お試しください。",
@@ -14,7 +16,7 @@ export const messages = {
     suffix: "人！",
   },
   form: {
-    title: "マップにピンを立てる",
+    title: "あなたもくいしんぼになろう",
     open: "ピンを立てる",
     close: "閉じる",
     nickname: "ニックネーム",

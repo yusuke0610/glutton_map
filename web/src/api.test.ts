@@ -37,6 +37,7 @@ describe("createPin", () => {
       nickname: "如月ファン",
       prefecture: "高知県" as const,
       city: "高知市",
+      municipality_code: "39201",
       comment: "唐揚げ最高",
     };
     const created = { ...payload, lat: 33.56, lng: 133.53 };
@@ -63,7 +64,12 @@ describe("createPin", () => {
     );
 
     await expect(
-      createPin({ nickname: "x", prefecture: "高知県", city: "高知市" }),
+      createPin({
+        nickname: "x",
+        prefecture: "高知県",
+        city: "高知市",
+        municipality_code: "39201",
+      }),
     ).rejects.toThrow("createPin failed: 400");
   });
 });

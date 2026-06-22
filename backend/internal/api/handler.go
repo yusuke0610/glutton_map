@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"math/rand"
 	"sync"
@@ -77,10 +78,9 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 		return PostApiPins400JSONResponse{Message: err.Error()}, nil
 	}
 
-	lat, lng, city, ok := h.coordinateFor(body)
-	if !ok {
-		// ValidateCreate で都道府県は検証済みなので通常ここには来ない（防御的）。
-		return PostApiPins400JSONResponse{Message: "都道府県が不正です"}, nil
+	lat, lng, city, err := h.resolveMunicipality(body)
+	if err != nil {
+		return PostApiPins400JSONResponse{Message: err.Error()}, nil
 	}
 
 	p := pin.Pin{
@@ -99,24 +99,48 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 	return PostApiPins201JSONResponse(toAPIPin(p)), nil
 }
 
-// coordinateFor は投稿の座標と保存用 city を決める。
-// 有効な municipality_code（指定都道府県に属する）があればその境界内に生成し、
-// city を正規名称で返す。なければ都道府県の重心+ゆらぎにフォールバックし、入力 city をそのまま返す。
-func (h *Handler) coordinateFor(body *CreatePinRequest) (lat, lng float64, city string, ok bool) {
-	if body.MunicipalityCode != nil && h.muni != nil {
-		if m, found := h.muni.Get(*body.MunicipalityCode); found && m.Prefecture == string(body.Prefecture) {
-			h.mu.Lock()
-			la, lo, sok := h.muni.SamplePoint(*body.MunicipalityCode, h.rng)
-			h.mu.Unlock()
-			if sok {
-				return la, lo, m.Name, true
-			}
-		}
+// resolveMunicipality は投稿の座標と保存用 city を決める。
+// あいまい検索の候補から選ばれた municipality_code を必須とし、コードが実在し、かつ
+// 選択した都道府県に属することを検証する。通れば境界内に座標を生成し、city を正規名称で返す。
+// 検証に通らないときは err を返し、呼び出し側が 400 で拒否する。
+//
+// 例外: 同梱の市区町村データのロードに失敗した縮退モード（h.muni == nil、起動時にログ済み）では
+// 検証不能なため、システムを止めないよう都道府県の重心+ゆらぎにフォールバックする。
+func (h *Handler) resolveMunicipality(body *CreatePinRequest) (lat, lng float64, city string, err error) {
+	// municipality_code は必須。候補未選択は縮退モードかどうかに関わらず拒否し、
+	// 縮退モードで空コードが 201 で通って必須契約を破らないようにする。
+	if body.MunicipalityCode == "" {
+		return 0, 0, "", fmt.Errorf("市区町村は候補から選択してください")
 	}
+
+	if h.muni == nil {
+		h.mu.Lock()
+		la, lo, ok := pin.CoordinateFor(pin.Prefecture(body.Prefecture), h.rng)
+		h.mu.Unlock()
+		if !ok {
+			// ValidateCreate で都道府県は検証済みなので通常ここには来ない（防御的）。
+			return 0, 0, "", fmt.Errorf("都道府県が不正です")
+		}
+		return la, lo, body.City, nil
+	}
+
+	m, found := h.muni.Get(body.MunicipalityCode)
+	if !found {
+		return 0, 0, "", fmt.Errorf("市区町村が見つかりません")
+	}
+	if m.Prefecture != string(body.Prefecture) {
+		return 0, 0, "", fmt.Errorf("市区町村が選択した都道府県に属していません")
+	}
+
 	h.mu.Lock()
-	la, lo, sok := pin.CoordinateFor(pin.Prefecture(body.Prefecture), h.rng)
+	la, lo, ok := h.muni.SamplePoint(body.MunicipalityCode, h.rng)
 	h.mu.Unlock()
-	return la, lo, body.City, sok
+	if !ok {
+		// SamplePoint は代表点フォールバックで常に true を返す想定（防御的）。
+		return 0, 0, "", fmt.Errorf("座標の生成に失敗しました")
+	}
+	// 表示用 city はコードの正規名称で上書きする（表記ゆれ対策）。
+	return la, lo, m.Name, nil
 }
 
 // toAPIPin はドメイン Pin を API レスポンスの Pin に変換する。

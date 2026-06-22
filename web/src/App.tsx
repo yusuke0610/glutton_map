@@ -9,6 +9,7 @@ import { mapStyle } from "./mapStyle";
 import { PREFECTURES, type Prefecture } from "./prefectures";
 import { MUNICIPALITIES } from "./municipalities";
 import { searchMunicipalities } from "./municipality-search";
+import { canSubmitPin } from "./pin-form";
 import { popupHTML } from "./popup";
 import {
   heatmapLayer,
@@ -72,6 +73,15 @@ const panelButtonStyle: React.CSSProperties = {
   padding: "10px 14px",
   fontWeight: "bold",
   cursor: "pointer",
+};
+// 無効時（市区町村を候補から選んでいない等）は白くぼかして押せないことを伝える。
+const panelButtonDisabledStyle: React.CSSProperties = {
+  background: "#e8e2dc",
+  color: "#fff",
+  cursor: "not-allowed",
+  opacity: 0.6,
+  filter: "blur(0.4px)",
+  boxShadow: "none",
 };
 const labelStyle: React.CSSProperties = {
   display: "flex",
@@ -260,7 +270,11 @@ export default function App() {
   // 投稿: createPin で送信し、成功したらマップを再取得して新しいピンを反映する。
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prefecture || submitting) return;
+    // 市区町村は候補から選択（municipalityCode あり）されていないと投稿できない。
+    // canSubmitPin は prefecture !== "" も確認するが、tsc に prefecture を絞り込ませる
+    // ため明示の早期 return も置く（これがないと createPin に "" が渡りうると判定される）。
+    if (!canSubmitPin({ prefecture, municipalityCode, submitting }) || prefecture === "")
+      return;
     setSubmitting(true);
     setFormNotice(null);
     try {
@@ -268,7 +282,7 @@ export default function App() {
         nickname,
         prefecture,
         city,
-        municipality_code: municipalityCode || undefined,
+        municipality_code: municipalityCode,
         comment: comment || undefined,
       });
       setFormNotice({ kind: "success", text: messages.form.success });
@@ -455,6 +469,11 @@ export default function App() {
                   </ul>
                 )}
               </div>
+              {city !== "" && municipalityCode === "" && (
+                <span role="alert" style={{ color: "#a6471a", fontSize: 12 }}>
+                  {messages.form.cityHint}
+                </span>
+              )}
             </label>
 
             <label style={labelStyle}>
@@ -468,7 +487,15 @@ export default function App() {
               />
             </label>
 
-            <button type="submit" disabled={submitting} style={panelButtonStyle}>
+            <button
+              type="submit"
+              disabled={!canSubmitPin({ prefecture, municipalityCode, submitting })}
+              style={
+                canSubmitPin({ prefecture, municipalityCode, submitting })
+                  ? panelButtonStyle
+                  : { ...panelButtonStyle, ...panelButtonDisabledStyle }
+              }
+            >
               {submitting ? messages.form.submitting : messages.form.submit}
             </button>
 

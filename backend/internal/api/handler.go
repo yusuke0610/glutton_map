@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kisaragi-ai-map/backend/internal/geo"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
 )
 
@@ -14,14 +15,24 @@ import (
 type Handler struct {
 	repo pin.PinRepository
 
+	// muni は市区町村の境界データ。コード指定時に境界内の座標を生成する。
+	// ロードに失敗したら nil になり、座標は都道府県重心へフォールバックする。
+	muni *geo.Index
+
 	// rng は投稿ピンの座標生成に使う。*rand.Rand は並行安全でないため mu で保護する。
 	mu  sync.Mutex
 	rng *rand.Rand
 }
 
 func NewHandler(repo pin.PinRepository) *Handler {
+	idx, err := geo.Default()
+	if err != nil {
+		// 同梱データの解析失敗は致命ではない（都道府県重心へフォールバックできる）。観測のためログする。
+		slog.Error("市区町村境界データのロードに失敗（都道府県重心にフォールバックします）", "error", err)
+	}
 	return &Handler{
 		repo: repo,
+		muni: idx,
 		rng:  rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
@@ -66,9 +77,7 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 		return PostApiPins400JSONResponse{Message: err.Error()}, nil
 	}
 
-	h.mu.Lock()
-	lat, lng, ok := pin.CoordinateFor(pin.Prefecture(body.Prefecture), h.rng)
-	h.mu.Unlock()
+	lat, lng, city, ok := h.coordinateFor(body)
 	if !ok {
 		// ValidateCreate で都道府県は検証済みなので通常ここには来ない（防御的）。
 		return PostApiPins400JSONResponse{Message: "都道府県が不正です"}, nil
@@ -79,7 +88,7 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 		Lat:        lat,
 		Lng:        lng,
 		Nickname:   body.Nickname,
-		City:       body.City,
+		City:       city,
 		Comment:    comment,
 	}
 	if err := h.repo.Insert(ctx, p); err != nil {
@@ -88,6 +97,26 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 	}
 
 	return PostApiPins201JSONResponse(toAPIPin(p)), nil
+}
+
+// coordinateFor は投稿の座標と保存用 city を決める。
+// 有効な municipality_code（指定都道府県に属する）があればその境界内に生成し、
+// city を正規名称で返す。なければ都道府県の重心+ゆらぎにフォールバックし、入力 city をそのまま返す。
+func (h *Handler) coordinateFor(body *CreatePinRequest) (lat, lng float64, city string, ok bool) {
+	if body.MunicipalityCode != nil && h.muni != nil {
+		if m, found := h.muni.Get(*body.MunicipalityCode); found && m.Prefecture == string(body.Prefecture) {
+			h.mu.Lock()
+			la, lo, sok := h.muni.SamplePoint(*body.MunicipalityCode, h.rng)
+			h.mu.Unlock()
+			if sok {
+				return la, lo, m.Name, true
+			}
+		}
+	}
+	h.mu.Lock()
+	la, lo, sok := pin.CoordinateFor(pin.Prefecture(body.Prefecture), h.rng)
+	h.mu.Unlock()
+	return la, lo, body.City, sok
 }
 
 // toAPIPin はドメイン Pin を API レスポンスの Pin に変換する。

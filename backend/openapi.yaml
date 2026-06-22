@@ -99,7 +99,12 @@ components:
           type: string
           minLength: 1
           maxLength: 50
-          description: 市区町村（表示用テキスト。座標には使わない）。
+          description: 市区町村（表示用テキスト）。municipality_code 指定時はサーバが正規名称で上書きする。
+        municipality_code:
+          type: string
+          description: |
+            全国地方公共団体コード（市区町村）。指定すると座標をその境界内に生成する。
+            未指定／不正なコードのときは都道府県の重心+ゆらぎにフォールバックする。
         comment:
           type: string
           maxLength: 200

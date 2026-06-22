@@ -2,6 +2,9 @@
 backend/data/
 backend/server
 
+# tools
+tools/municipalities/node_modules/
+
 # web
 web/node_modules/
 web/dist/

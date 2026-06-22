@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { createPin, fetchPins } from "./api";
@@ -7,6 +7,8 @@ import { logger } from "./logger";
 import { messages } from "./messages";
 import { mapStyle } from "./mapStyle";
 import { PREFECTURES, type Prefecture } from "./prefectures";
+import { MUNICIPALITIES } from "./municipalities";
+import { searchMunicipalities } from "./municipality-search";
 import { popupHTML } from "./popup";
 import {
   heatmapLayer,
@@ -84,6 +86,33 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid #ccc",
   font: "inherit",
 };
+// 市区町村のあいまい検索候補リスト（入力欄の下に重ねて表示）。
+const suggestionListStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "100%",
+  left: 0,
+  right: 0,
+  margin: "2px 0 0",
+  padding: 0,
+  listStyle: "none",
+  background: "#fff",
+  border: "1px solid #ccc",
+  borderRadius: 6,
+  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+  maxHeight: 180,
+  overflowY: "auto",
+  zIndex: 3,
+};
+const suggestionItemStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  textAlign: "left",
+  background: "transparent",
+  border: "none",
+  padding: "8px 10px",
+  font: "inherit",
+  cursor: "pointer",
+};
 // 罰（×）の閉じるボタン。テキストではなくアイコン表示にする。
 const closeButtonStyle: React.CSSProperties = {
   background: "transparent",
@@ -111,12 +140,25 @@ export default function App() {
   const [nickname, setNickname] = useState("");
   const [prefecture, setPrefecture] = useState<Prefecture | "">("");
   const [city, setCity] = useState("");
+  // 選択された市区町村の全国地方公共団体コード。空 = 未選択（自由入力のフォールバック）。
+  const [municipalityCode, setMunicipalityCode] = useState("");
+  // 市区町村入力のフォーカス状態（候補リストの表示制御）。
+  const [cityFocused, setCityFocused] = useState(false);
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   // 投稿結果の通知（成功 or 失敗）。
   const [formNotice, setFormNotice] = useState<
     { kind: "success" | "error"; text: string } | null
   >(null);
+
+  // 市区町村のあいまい検索候補。コード選択済み（municipalityCode!=""）のときは出さない。
+  const citySuggestions = useMemo(
+    () =>
+      municipalityCode === ""
+        ? searchMunicipalities(MUNICIPALITIES, prefecture, city, 8)
+        : [],
+    [prefecture, city, municipalityCode],
+  );
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -226,6 +268,7 @@ export default function App() {
         nickname,
         prefecture,
         city,
+        municipality_code: municipalityCode || undefined,
         comment: comment || undefined,
       });
       setFormNotice({ kind: "success", text: messages.form.success });
@@ -233,6 +276,7 @@ export default function App() {
       setNickname("");
       setPrefecture("");
       setCity("");
+      setMunicipalityCode("");
       setComment("");
       setReloadKey((k) => k + 1);
     } catch (err) {
@@ -341,7 +385,12 @@ export default function App() {
               <select
                 required
                 value={prefecture}
-                onChange={(e) => setPrefecture(e.target.value as Prefecture)}
+                onChange={(e) => {
+                  setPrefecture(e.target.value as Prefecture);
+                  // 都道府県を変えたら市区町村の選択をリセットする。
+                  setCity("");
+                  setMunicipalityCode("");
+                }}
                 style={inputStyle}
               >
                 <option value="" disabled>
@@ -357,14 +406,48 @@ export default function App() {
 
             <label style={labelStyle}>
               {messages.form.city}
-              <input
-                type="text"
-                required
-                maxLength={50}
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                style={inputStyle}
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  type="text"
+                  required
+                  maxLength={50}
+                  value={city}
+                  role="combobox"
+                  aria-expanded={cityFocused && citySuggestions.length > 0}
+                  aria-autocomplete="list"
+                  autoComplete="off"
+                  onChange={(e) => {
+                    // 手入力したらコード選択を解除（候補から選び直す or 自由入力フォールバック）。
+                    setCity(e.target.value);
+                    setMunicipalityCode("");
+                  }}
+                  onFocus={() => setCityFocused(true)}
+                  // クリック確定（onMouseDown）を取りこぼさないよう遅延して閉じる。
+                  onBlur={() => setTimeout(() => setCityFocused(false), 120)}
+                  style={inputStyle}
+                />
+                {cityFocused && citySuggestions.length > 0 && (
+                  <ul role="listbox" style={suggestionListStyle}>
+                    {citySuggestions.map((m) => (
+                      <li key={m.code} role="option" aria-selected={false}>
+                        <button
+                          type="button"
+                          // onMouseDown は input の onBlur より先に発火するので選択が確実に通る。
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setCity(m.name);
+                            setMunicipalityCode(m.code);
+                            setCityFocused(false);
+                          }}
+                          style={suggestionItemStyle}
+                        >
+                          {m.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </label>
 
             <label style={labelStyle}>

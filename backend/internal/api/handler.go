@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kisaragi-ai-map/backend/internal/geo"
+	"github.com/kisaragi-ai-map/backend/internal/httpmw"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
 )
 
@@ -90,6 +91,9 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 		Nickname:   body.Nickname,
 		City:       city,
 		Comment:    comment,
+		// 投稿は拒否せずそのまま保存し、提出用集計でユニーク化する。
+		// ip_hash はミドルウェアが context に載せた匿名識別子（生IPは持たない）。
+		IPHash: httpmw.IPHashFrom(ctx),
 	}
 	if err := h.repo.Insert(ctx, p); err != nil {
 		slog.Error("ピン投稿の保存に失敗", "error", err)

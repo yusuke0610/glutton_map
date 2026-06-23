@@ -6,6 +6,8 @@ type Prefecture string
 // Pin は地図上の1点。最小スライスでは緯度経度はただのカラム。
 // Nickname/City/Comment はファン投稿で入る表示用の情報（ポップアップで見せる）。
 // seed 由来のピンではこれらは空文字になる。
+// IPHash は投稿者の匿名識別子（salt 付き SHA-256）。地図には出さず、提出用の
+// ユニークファン集計（連投・curl の重複排除）にのみ使う。seed 由来では空文字。
 type Pin struct {
 	Prefecture Prefecture
 	Lat        float64
@@ -13,6 +15,13 @@ type Pin struct {
 	Nickname   string
 	City       string
 	Comment    string
+	IPHash     string
+}
+
+// PinStat は提出用集計に必要な最小フィールド。地図用の取得とは別経路で使う。
+type PinStat struct {
+	Prefecture Prefecture
+	IPHash     string
 }
 
 // Summary はヒーロー指標の集計結果。

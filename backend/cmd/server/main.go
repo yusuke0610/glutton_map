@@ -52,6 +52,23 @@ func main() {
 	// gin.Default() は標準の text ロガーを含むため、gin.New() に
 	// Recovery と自前の slog リクエストログを載せて構造化ログに統一する。
 	router := gin.New()
+	// ミドルウェアが request context に載せた値（ip_hash）を、strict-server の
+	// ハンドラが context.Context 経由で読めるようにする。
+	router.ContextWithFallback = true
+
+	// ClientIP() の信頼境界を明示する。未設定だと gin は全プロキシを信頼し
+	// X-Forwarded-For を無検証で採用するため、ヘッダ偽装でレート制限や ip_hash の
+	// 重複排除を回避できてしまう。既定は localhost のみ信頼（直公開でも詐称不可）。
+	// 実際にリバースプロキシ/LB の背後に置く場合は TRUSTED_PROXIES でその IP を指定する。
+	trustedProxies := []string{"127.0.0.1", "::1"}
+	if v := os.Getenv("TRUSTED_PROXIES"); v != "" {
+		trustedProxies = strings.Split(v, ",")
+	}
+	if err := router.SetTrustedProxies(trustedProxies); err != nil {
+		log.Error("invalid TRUSTED_PROXIES", "error", err)
+		os.Exit(1)
+	}
+
 	router.Use(gin.Recovery(), requestLogger(log))
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: allowOrigins,
@@ -63,6 +80,16 @@ func main() {
 	// 投稿(POST)のスパム対策: IP 単位のクールダウン。認証なしの軽い濫用対策。
 	limiter := httpmw.NewLimiter(3 * time.Second)
 	router.Use(limiter.Middleware("POST"))
+
+	// 投稿者の匿名識別子（ip_hash）を context に載せる。投稿は拒否せず、提出用集計で
+	// 連投・curl をユニーク化するために使う。salt は固定値を使うこと（変えると過去ハッシュと
+	// 一致しなくなる）。生IPは保存しない。
+	ipSalt := os.Getenv("IP_HASH_SALT")
+	if ipSalt == "" {
+		ipSalt = "glutton-map-dev-salt" // 開発用デフォルト。本番は IP_HASH_SALT を必ず設定する。
+		log.Warn("IP_HASH_SALT 未設定: 開発用デフォルトを使用（本番では必ず設定すること）")
+	}
+	router.Use(httpmw.IPHashMiddleware(ipSalt))
 
 	// strict-server: NewStrictHandler でラップしてから登録する。
 	h := api.NewStrictHandler(api.NewHandler(repo), nil)

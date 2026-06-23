@@ -3,6 +3,7 @@ package pin
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/glebarez/sqlite" // pure Go(modernc ベース)の GORM ドライバ。非cgo。
 	"gorm.io/gorm"
@@ -15,6 +16,8 @@ type PinRepository interface {
 	Count(ctx context.Context) (int, error)
 	// Insert は seed が1件投入するための最小 API。
 	Insert(ctx context.Context, p Pin) error
+	// ListForStats は提出用集計に必要な最小データ（prefecture/ip_hash）を全件返す。
+	ListForStats(ctx context.Context) ([]PinStat, error)
 }
 
 // pinRow は永続化モデル。スキーマ（カラム/制約）を知るのはこのファイルだけ。
@@ -28,6 +31,10 @@ type pinRow struct {
 	Nickname string `gorm:"not null;default:''"`
 	City     string `gorm:"not null;default:''"`
 	Comment  string `gorm:"not null;default:''"`
+	// IPHash は投稿者の匿名識別子（分析専用）。地図には出さない。既存行は空文字。
+	IPHash string `gorm:"not null;default:'';index"`
+	// CreatedAt は GORM が作成時に自動設定する。連投・curl の時系列分析用。
+	CreatedAt time.Time
 }
 
 // TableName は GORM の複数形化（pin_rows）を抑え、テーブル名を pins に固定する。
@@ -44,6 +51,7 @@ func rowFromDomain(p Pin) pinRow {
 	return pinRow{
 		Prefecture: string(p.Prefecture), Lat: p.Lat, Lng: p.Lng,
 		Nickname: p.Nickname, City: p.City, Comment: p.Comment,
+		IPHash: p.IPHash,
 	}
 }
 
@@ -90,4 +98,18 @@ func (r *sqliteRepo) Insert(ctx context.Context, p Pin) error {
 		return fmt.Errorf("ピンの挿入: %w", err)
 	}
 	return nil
+}
+
+// ListForStats は集計に必要な prefecture/ip_hash だけを全件返す。
+// 地図用の GetPins とは別経路で、提出用のユニークファン集計に使う。
+func (r *sqliteRepo) ListForStats(ctx context.Context) ([]PinStat, error) {
+	var rows []pinRow
+	if err := r.db.WithContext(ctx).Select("prefecture", "ip_hash").Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("集計用ピンの取得: %w", err)
+	}
+	stats := make([]PinStat, 0, len(rows))
+	for _, row := range rows {
+		stats = append(stats, PinStat{Prefecture: Prefecture(row.Prefecture), IPHash: row.IPHash})
+	}
+	return stats, nil
 }

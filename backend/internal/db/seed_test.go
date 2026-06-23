@@ -20,6 +20,7 @@ func (m *memRepo) Insert(ctx context.Context, p pin.Pin) error {
 	m.pins = append(m.pins, p)
 	return nil
 }
+func (m *memRepo) ListForStats(ctx context.Context) ([]pin.PinStat, error) { return nil, nil }
 
 // failRepo は指定した操作でエラーを返すフェイク。エラーの文脈付与を検証する。
 type failRepo struct {
@@ -41,6 +42,7 @@ func (f *failRepo) Insert(ctx context.Context, p pin.Pin) error {
 	}
 	return nil
 }
+func (f *failRepo) ListForStats(ctx context.Context) ([]pin.PinStat, error) { return nil, nil }
 
 // countByPrefecture は都道府県ごとの件数を数える。
 func countByPrefecture(pins []pin.Pin) map[pin.Prefecture]int {

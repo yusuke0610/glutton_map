@@ -4,7 +4,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help gen gen-backend gen-web gen-kana gen-municipalities build build-backend build-web \
-        test test-backend test-web test-e2e lint lint-backend lint-web run dev up down clean
+        test test-backend test-web test-e2e lint lint-backend lint-web run dev up down clean stats
 
 ## help: ターゲット一覧を表示
 help:
@@ -69,6 +69,10 @@ lint-web:
 ## run: API をローカル起動（:8001、PORT env で変更可）
 run:
 	cd backend && LIBSQL_URL=file:./data/pins.db go run ./cmd/server
+
+## stats: 提出用のユニークファン集計を出力（FORMAT=csv で都道府県別CSV、> でファイル保存）
+stats:
+	cd backend && LIBSQL_URL=file:./data/pins.db FORMAT=$(FORMAT) go run ./cmd/stats
 
 ## dev: フロント開発サーバ（localhost:5174）
 dev:

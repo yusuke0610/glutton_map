@@ -55,6 +55,20 @@ func main() {
 	// ミドルウェアが request context に載せた値（ip_hash）を、strict-server の
 	// ハンドラが context.Context 経由で読めるようにする。
 	router.ContextWithFallback = true
+
+	// ClientIP() の信頼境界を明示する。未設定だと gin は全プロキシを信頼し
+	// X-Forwarded-For を無検証で採用するため、ヘッダ偽装でレート制限や ip_hash の
+	// 重複排除を回避できてしまう。既定は localhost のみ信頼（直公開でも詐称不可）。
+	// 実際にリバースプロキシ/LB の背後に置く場合は TRUSTED_PROXIES でその IP を指定する。
+	trustedProxies := []string{"127.0.0.1", "::1"}
+	if v := os.Getenv("TRUSTED_PROXIES"); v != "" {
+		trustedProxies = strings.Split(v, ",")
+	}
+	if err := router.SetTrustedProxies(trustedProxies); err != nil {
+		log.Error("invalid TRUSTED_PROXIES", "error", err)
+		os.Exit(1)
+	}
+
 	router.Use(gin.Recovery(), requestLogger(log))
 	router.Use(cors.New(cors.Config{
 		AllowOrigins: allowOrigins,

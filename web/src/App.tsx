@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { fetchPins, type Pin } from "./api/api";
+import { fetchPins, fetchPrefectureAt, type Pin } from "./api/api";
 import { shouldAnimateDrop, flyToOptionsFor, DROP_TIMING } from "./map/pin-drop";
 import { logger } from "./lib/logger";
 import { messages } from "./lib/messages";
 import { mapStyle } from "./map/mapStyle";
-import { popupHTML } from "./map/popup";
+import { popupHTML, prefectureStatHTML } from "./map/popup";
 import { createPinIcon } from "./map/pinIcon";
 import { buildPinGeojson } from "./map/pinGeojson";
 import {
@@ -16,6 +16,13 @@ import {
   PINS_SOURCE_ID,
   pinIconLayer,
 } from "./map/pinLayers";
+import {
+  boundaryFilterFor,
+  PREFECTURE_DATA_URL,
+  PREFECTURE_LINE_LAYER_ID,
+  PREFECTURE_SOURCE_ID,
+  prefectureBoundaryLayer,
+} from "./map/prefectureBoundary";
 import { AppTitle } from "./components/AppTitle";
 import { HeroCounter } from "./components/HeroCounter";
 import { PinDropOverlay } from "./components/PinDropOverlay";
@@ -27,6 +34,8 @@ export default function App() {
   // 地図インスタンスとポップアップを保持し、投稿後の flyTo / popup から参照する。
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  // 県集計の吹き出し。ピン用 popup とは別管理にして二重表示を避ける。
+  const prefPopupRef = useRef<maplibregl.Popup | null>(null);
   // ユーザー向けエラー文言（null = エラーなし）。
   const [error, setError] = useState<string | null>(null);
   // 再試行トリガ。値を増やすと useEffect が再実行され map を作り直す。
@@ -51,6 +60,14 @@ export default function App() {
       if (!map.hasImage(PIN_ICON_IMAGE)) {
         const icon = createPinIcon();
         map.addImage(PIN_ICON_IMAGE, icon.image, icon.options);
+      }
+      // 選択県の赤線境界はピン/ヒートより先に追加し、ピンを常に上に保つ。
+      if (!map.getSource(PREFECTURE_SOURCE_ID)) {
+        map.addSource(PREFECTURE_SOURCE_ID, {
+          type: "geojson",
+          data: PREFECTURE_DATA_URL,
+        });
+        map.addLayer(prefectureBoundaryLayer());
       }
       map.addSource(PINS_SOURCE_ID, { type: "geojson", data: geojson });
       // ハイブリッド表示: ズームアウト=ヒートマップ（分布）、ズームイン=ピン（個別）。
@@ -125,10 +142,44 @@ export default function App() {
       map.getCanvas().style.cursor = "";
     });
 
+    // 地図クリックでその地点の都道府県のピン合計を吹き出し表示する。
+    // ピンを直接クリックした場合は上のピン用ハンドラに任せ、二重表示を防ぐ。
+    const prefPopup = new maplibregl.Popup({ closeButton: true, closeOnClick: true });
+    prefPopupRef.current = prefPopup;
+    // 吹き出しを閉じたら赤線ハイライトも消す（選択解除）。
+    prefPopup.on("close", () => {
+      if (map.getLayer(PREFECTURE_LINE_LAYER_ID)) {
+        map.setFilter(PREFECTURE_LINE_LAYER_ID, boundaryFilterFor(null));
+      }
+    });
+    map.on("click", async (e) => {
+      const onPin = map.queryRenderedFeatures(e.point, {
+        layers: [PIN_ICON_LAYER_ID],
+      });
+      if (onPin.length > 0) return;
+      try {
+        const stat = await fetchPrefectureAt(e.lngLat.lat, e.lngLat.lng);
+        if (!stat) {
+          // 海上など → 吹き出しを出さず、赤線も消す。
+          map.setFilter(PREFECTURE_LINE_LAYER_ID, boundaryFilterFor(null));
+          return;
+        }
+        // 選択県を赤線で囲い、その県の集計を吹き出し表示する。
+        map.setFilter(
+          PREFECTURE_LINE_LAYER_ID,
+          boundaryFilterFor(stat.prefecture),
+        );
+        prefPopup.setLngLat(e.lngLat).setHTML(prefectureStatHTML(stat)).addTo(map);
+      } catch (err) {
+        logger.error("都道府県集計の取得に失敗", err);
+      }
+    });
+
     return () => {
       map.remove();
       mapRef.current = null;
       popupRef.current = null;
+      prefPopupRef.current = null;
     };
   }, [reloadKey, refreshPins]);
 

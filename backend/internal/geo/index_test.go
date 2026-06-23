@@ -101,6 +101,29 @@ func TestParseGeoJSONRejectsRepOutside(t *testing.T) {
 	}
 }
 
+func TestPrefectureAt(t *testing.T) {
+	ix := mustParse(t)
+	tests := []struct {
+		name    string
+		lat     float64
+		lng     float64
+		want    string
+		wantOK  bool
+	}{
+		{"練馬区の内側は東京都", 35.75, 139.65, "東京都", true},
+		{"高知市の内側は高知県", 33.55, 133.55, "高知県", true},
+		{"いずれの矩形外(海上など)は該当なし", 30.0, 140.0, "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := ix.PrefectureAt(tt.lat, tt.lng)
+			if got != tt.want || ok != tt.wantOK {
+				t.Errorf("PrefectureAt(%f,%f) = %q,%v; want %q,%v", tt.lat, tt.lng, got, ok, tt.want, tt.wantOK)
+			}
+		})
+	}
+}
+
 func TestRepresentativePointInside(t *testing.T) {
 	ix := mustParse(t)
 	for _, code := range []string{"13120", "39201"} {

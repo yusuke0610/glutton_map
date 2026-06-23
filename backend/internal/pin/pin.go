@@ -32,6 +32,18 @@ type Summary struct {
 	Total           int
 }
 
+// CountByPrefecture は pins のうち target に一致するピンの件数を数える純粋関数。
+// クリック地点の都道府県1件分の集計に使う（一致が無ければ 0）。
+func CountByPrefecture(pins []Pin, target Prefecture) int {
+	n := 0
+	for _, p := range pins {
+		if p.Prefecture == target {
+			n++
+		}
+	}
+	return n
+}
+
 // Summarize は pins から Summary を計算する純粋関数。
 func Summarize(pins []Pin) Summary {
 	seen := map[Prefecture]struct{}{}

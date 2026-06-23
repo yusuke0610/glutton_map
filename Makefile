@@ -3,7 +3,7 @@
 # まとめて nix 経由で叩きたいときは: nix develop --command make <target>
 
 .DEFAULT_GOAL := help
-.PHONY: help gen gen-backend gen-web gen-kana gen-municipalities build build-backend build-web \
+.PHONY: help gen gen-backend gen-web gen-kana gen-municipalities gen-prefectures build build-backend build-web \
         test test-backend test-web test-e2e lint lint-backend lint-web run dev up down clean stats
 
 ## help: ターゲット一覧を表示
@@ -28,6 +28,10 @@ gen-kana:
 ## gen-municipalities: 行政区域(N03)から市区町村データを生成（要 N03_GEOJSON）
 gen-municipalities:
 	cd tools/municipalities && bun install && N03_GEOJSON=$(N03_GEOJSON) SIMPLIFY=$(SIMPLIFY) KANA_CSV=$(KANA_CSV) node generate.mjs
+
+## gen-prefectures: コミット済み市区町村を都道府県でdissolveし web/public/prefectures.geojson を生成（赤線ハイライト用）
+gen-prefectures:
+	cd tools/municipalities && bun install && SIMPLIFY=$(SIMPLIFY) node generate-prefectures.mjs
 
 ## build: バックエンド・フロント両方をビルド
 build: build-backend build-web

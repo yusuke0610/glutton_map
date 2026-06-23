@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createPin, fetchPins } from "./api";
+import { createPin, fetchPins, fetchPrefectureAt } from "./api";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -71,5 +71,45 @@ describe("createPin", () => {
         municipality_code: "39201",
       }),
     ).rejects.toThrow("createPin failed: 400");
+  });
+});
+
+describe("fetchPrefectureAt", () => {
+  it("200 のときは都道府県と件数を返し、lat/lng をクエリに乗せる", async () => {
+    const stat = { prefecture: "東京都" as const, count: 42 };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => stat,
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const got = await fetchPrefectureAt(35.69, 139.69);
+
+    expect(got).toEqual(stat);
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain("/api/prefectures/at");
+    expect(url).toContain("lat=35.69");
+    expect(url).toContain("lng=139.69");
+  });
+
+  it("404（海上など）のときは null を返す", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 404 }),
+    );
+
+    await expect(fetchPrefectureAt(30, 145)).resolves.toBeNull();
+  });
+
+  it("その他のエラーは例外を投げる", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 500 }),
+    );
+
+    await expect(fetchPrefectureAt(35, 139)).rejects.toThrow(
+      "fetchPrefectureAt failed: 500",
+    );
   });
 });

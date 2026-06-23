@@ -62,6 +62,32 @@ func (h *Handler) GetApiPins(ctx context.Context, _ GetApiPinsRequestObject) (Ge
 	}, nil
 }
 
+// GetPrefectureAt はクリック地点(lat/lng)の都道府県を行政区域ポリゴンで判定し、
+// その都道府県のピン合計件数を返す。地点がどの都道府県にも属さない(海上など)場合は 404。
+func (h *Handler) GetPrefectureAt(ctx context.Context, request GetPrefectureAtRequestObject) (GetPrefectureAtResponseObject, error) {
+	if h.muni == nil {
+		// 境界データのロードに失敗した縮退モードでは判定できない（起動時にログ済み）。
+		return GetPrefectureAt500JSONResponse{Message: "都道府県の判定ができません"}, nil
+	}
+
+	prefecture, ok := h.muni.PrefectureAt(request.Params.Lat, request.Params.Lng)
+	if !ok {
+		return GetPrefectureAt404JSONResponse{Message: "この地点に該当する都道府県がありません"}, nil
+	}
+
+	pins, err := h.repo.GetPins(ctx)
+	if err != nil {
+		slog.Error("ピン取得に失敗", "error", err)
+		return GetPrefectureAt500JSONResponse{Message: "ピンの取得に失敗しました"}, nil
+	}
+
+	count := pin.CountByPrefecture(pins, pin.Prefecture(prefecture))
+	return GetPrefectureAt200JSONResponse{
+		Prefecture: Prefecture(prefecture),
+		Count:      count,
+	}, nil
+}
+
 // PostApiPins はファン投稿を1件受け取り、検証→座標生成→保存して 201 で返す。
 // 座標はサーバが都道府県の重心+ゆらぎで生成し、クライアントの lat/lng は受け取らない。
 func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObject) (PostApiPinsResponseObject, error) {

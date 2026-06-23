@@ -54,6 +54,23 @@ func (ix *Index) SamplePoint(code string, r *rand.Rand) (lat, lng float64, ok bo
 	return m.Rep.Lat, m.Rep.Lng, true
 }
 
+// PrefectureAt は座標(lat, lng)を含む市区町村を探し、その都道府県名を返す。
+// 市区町村は非重複なので、どこに属するかは反復順に依らず一意に定まる。
+// bbox で安価に足切りしてから多角形の内包判定を行うため、全国規模でも実用的な速度になる。
+// どの市区町村にも属さない(海上など)場合は ok=false。
+func (ix *Index) PrefectureAt(lat, lng float64) (prefecture string, ok bool) {
+	p := Point{Lng: lng, Lat: lat}
+	for _, m := range ix.byCode {
+		if !m.bbox.Contains(p) {
+			continue
+		}
+		if m.Geometry.Contains(p) {
+			return m.Prefecture, true
+		}
+	}
+	return "", false
+}
+
 // --- GeoJSON パース ---
 
 type featureCollection struct {

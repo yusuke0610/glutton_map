@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/oapi-codegen/runtime"
 )
 
 // Defines values for Prefecture.
@@ -226,6 +227,24 @@ type PinsResponse struct {
 // Prefecture 標準47都道府県
 type Prefecture string
 
+// PrefectureStat defines model for PrefectureStat.
+type PrefectureStat struct {
+	// Count その都道府県のピン合計件数。
+	Count int `json:"count"`
+
+	// Prefecture 標準47都道府県
+	Prefecture Prefecture `json:"prefecture"`
+}
+
+// GetPrefectureAtParams defines parameters for GetPrefectureAt.
+type GetPrefectureAtParams struct {
+	// Lat クリック地点の緯度。
+	Lat float64 `form:"lat" json:"lat"`
+
+	// Lng クリック地点の経度。
+	Lng float64 `form:"lng" json:"lng"`
+}
+
 // PostApiPinsJSONRequestBody defines body for PostApiPins for application/json ContentType.
 type PostApiPinsJSONRequestBody = CreatePinRequest
 
@@ -237,6 +256,9 @@ type ServerInterface interface {
 	// ファンがピンを1件投稿する（認証なし）
 	// (POST /api/pins)
 	PostApiPins(c *gin.Context)
+	// クリック地点の都道府県とそのピン合計件数を返す
+	// (GET /api/prefectures/at)
+	GetPrefectureAt(c *gin.Context, params GetPrefectureAtParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -274,6 +296,41 @@ func (siw *ServerInterfaceWrapper) PostApiPins(c *gin.Context) {
 	siw.Handler.PostApiPins(c)
 }
 
+// GetPrefectureAt operation middleware
+func (siw *ServerInterfaceWrapper) GetPrefectureAt(c *gin.Context) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetPrefectureAtParams
+
+	// ------------- Required query parameter "lat" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "lat", c.Request.URL.Query(), &params.Lat, runtime.BindQueryParameterOptions{Type: "number", Format: "double"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter lat: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	// ------------- Required query parameter "lng" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "lng", c.Request.URL.Query(), &params.Lng, runtime.BindQueryParameterOptions{Type: "number", Format: "double"})
+	if err != nil {
+		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter lng: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetPrefectureAt(c, params)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -303,6 +360,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 
 	router.GET(options.BaseURL+"/api/pins", wrapper.GetApiPins)
 	router.POST(options.BaseURL+"/api/pins", wrapper.PostApiPins)
+	router.GET(options.BaseURL+"/api/prefectures/at", wrapper.GetPrefectureAt)
 }
 
 type GetApiPinsRequestObject struct {
@@ -390,6 +448,70 @@ func (response PostApiPins500JSONResponse) VisitPostApiPinsResponse(w http.Respo
 	return err
 }
 
+type GetPrefectureAtRequestObject struct {
+	Params GetPrefectureAtParams
+}
+
+type GetPrefectureAtResponseObject interface {
+	VisitGetPrefectureAtResponse(w http.ResponseWriter) error
+}
+
+type GetPrefectureAt200JSONResponse PrefectureStat
+
+func (response GetPrefectureAt200JSONResponse) VisitGetPrefectureAtResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPrefectureAt400JSONResponse Error
+
+func (response GetPrefectureAt400JSONResponse) VisitGetPrefectureAtResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPrefectureAt404JSONResponse Error
+
+func (response GetPrefectureAt404JSONResponse) VisitGetPrefectureAtResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPrefectureAt500JSONResponse Error
+
+func (response GetPrefectureAt500JSONResponse) VisitGetPrefectureAtResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ヒートマップ用のピン一覧を取得する
@@ -398,6 +520,9 @@ type StrictServerInterface interface {
 	// ファンがピンを1件投稿する（認証なし）
 	// (POST /api/pins)
 	PostApiPins(ctx context.Context, request PostApiPinsRequestObject) (PostApiPinsResponseObject, error)
+	// クリック地点の都道府県とそのピン合計件数を返す
+	// (GET /api/prefectures/at)
+	GetPrefectureAt(ctx context.Context, request GetPrefectureAtRequestObject) (GetPrefectureAtResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx *gin.Context, request any) (any, error)
@@ -505,6 +630,32 @@ func (sh *strictHandler) PostApiPins(ctx *gin.Context) {
 		sh.options.HandlerErrorFunc(ctx, err)
 	} else if validResponse, ok := response.(PostApiPinsResponseObject); ok {
 		if err := validResponse.VisitPostApiPinsResponse(ctx.Writer); err != nil {
+			sh.options.ResponseErrorHandlerFunc(ctx, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(ctx, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPrefectureAt operation middleware
+func (sh *strictHandler) GetPrefectureAt(ctx *gin.Context, params GetPrefectureAtParams) {
+	var request GetPrefectureAtRequestObject
+
+	request.Params = params
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPrefectureAt(ctx, request.(GetPrefectureAtRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPrefectureAt")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		sh.options.HandlerErrorFunc(ctx, err)
+	} else if validResponse, ok := response.(GetPrefectureAtResponseObject); ok {
+		if err := validResponse.VisitGetPrefectureAtResponse(ctx.Writer); err != nil {
 			sh.options.ResponseErrorHandlerFunc(ctx, err)
 		}
 	} else if response != nil {

@@ -274,6 +274,91 @@ func TestPostApiPins_不正入力は400(t *testing.T) {
 	}
 }
 
+func TestGetPrefectureAt_県内なら件数を返す(t *testing.T) {
+	repo := &fakeRepo{pins: []pin.Pin{
+		{Prefecture: "東京都", Lat: 35.6, Lng: 139.7},
+		{Prefecture: "東京都", Lat: 35.7, Lng: 139.8},
+		{Prefecture: "大阪府", Lat: 34.7, Lng: 135.5},
+	}}
+	h := NewHandler(repo)
+
+	// 練馬区あたり（東京都）の座標。
+	req := GetPrefectureAtRequestObject{Params: GetPrefectureAtParams{Lat: 35.735, Lng: 139.65}}
+	resp, err := h.GetPrefectureAt(context.Background(), req)
+	if err != nil {
+		t.Fatalf("予期しないエラー: %v", err)
+	}
+	got, ok := resp.(GetPrefectureAt200JSONResponse)
+	if !ok {
+		t.Fatalf("レスポンス型 = %T, want GetPrefectureAt200JSONResponse", resp)
+	}
+	if got.Prefecture != "東京都" {
+		t.Errorf("Prefecture = %q, want 東京都", got.Prefecture)
+	}
+	if got.Count != 2 {
+		t.Errorf("Count = %d, want 2", got.Count)
+	}
+}
+
+func TestGetPrefectureAt_ピンが無い県は0件で200(t *testing.T) {
+	repo := &fakeRepo{pins: []pin.Pin{{Prefecture: "大阪府", Lat: 34.7, Lng: 135.5}}}
+	h := NewHandler(repo)
+
+	req := GetPrefectureAtRequestObject{Params: GetPrefectureAtParams{Lat: 35.735, Lng: 139.65}}
+	resp, err := h.GetPrefectureAt(context.Background(), req)
+	if err != nil {
+		t.Fatalf("予期しないエラー: %v", err)
+	}
+	got, ok := resp.(GetPrefectureAt200JSONResponse)
+	if !ok {
+		t.Fatalf("レスポンス型 = %T, want GetPrefectureAt200JSONResponse", resp)
+	}
+	if got.Prefecture != "東京都" || got.Count != 0 {
+		t.Errorf("got %q/%d, want 東京都/0", got.Prefecture, got.Count)
+	}
+}
+
+func TestGetPrefectureAt_海上は404(t *testing.T) {
+	h := NewHandler(&fakeRepo{})
+
+	// 太平洋上（どの市区町村にも属さない）。
+	req := GetPrefectureAtRequestObject{Params: GetPrefectureAtParams{Lat: 30.0, Lng: 145.0}}
+	resp, err := h.GetPrefectureAt(context.Background(), req)
+	if err != nil {
+		t.Fatalf("予期しないエラー: %v", err)
+	}
+	if _, ok := resp.(GetPrefectureAt404JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want GetPrefectureAt404JSONResponse", resp)
+	}
+}
+
+func TestGetPrefectureAt_縮退モードは500(t *testing.T) {
+	// 境界データのロードに失敗した縮退モード（muni == nil）では判定不能なので 500。
+	h := &Handler{repo: &fakeRepo{}, rng: rand.New(rand.NewSource(1))}
+
+	req := GetPrefectureAtRequestObject{Params: GetPrefectureAtParams{Lat: 35.735, Lng: 139.65}}
+	resp, err := h.GetPrefectureAt(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err = %v, want nil（型付き500で返すべき）", err)
+	}
+	if _, ok := resp.(GetPrefectureAt500JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want GetPrefectureAt500JSONResponse", resp)
+	}
+}
+
+func TestGetPrefectureAt_repoエラーは型付き500を返す(t *testing.T) {
+	h := NewHandler(&fakeRepo{err: errors.New("db 接続失敗")})
+
+	req := GetPrefectureAtRequestObject{Params: GetPrefectureAtParams{Lat: 35.735, Lng: 139.65}}
+	resp, err := h.GetPrefectureAt(context.Background(), req)
+	if err != nil {
+		t.Fatalf("err = %v, want nil（型付き500で返すべき）", err)
+	}
+	if _, ok := resp.(GetPrefectureAt500JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want GetPrefectureAt500JSONResponse", resp)
+	}
+}
+
 func TestGetApiPins_repoエラーは型付き500を返す(t *testing.T) {
 	h := NewHandler(&fakeRepo{err: errors.New("db 接続失敗")})
 

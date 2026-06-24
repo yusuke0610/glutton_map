@@ -16,6 +16,15 @@ type Pin struct {
 	City       string
 	Comment    string
 	IPHash     string
+	// 分析専用フィールド。地図用レスポンス(toAPIPin)には出さない。
+	// PrefectureCode は JIS 都道府県コード(2桁)。集計高速化のための非正規化。
+	PrefectureCode string
+	// AnonToken は匿名投稿者の識別子（後からアカウントへ claim する余地用）。
+	AnonToken string
+	// UTM* は流入元の計測値。後から復元できないため投稿の瞬間に記録する。
+	UTMSource   string
+	UTMMedium   string
+	UTMCampaign string
 }
 
 // PinStat は提出用集計に必要な最小フィールド。地図用の取得とは別経路で使う。

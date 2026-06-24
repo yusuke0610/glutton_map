@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { createPin, type Pin } from "../api/api";
 import { logger } from "../lib/logger";
 import { messages } from "../lib/messages";
+import { getOrCreateAnonToken } from "../lib/anonToken";
+import type { UTMParams } from "../lib/deeplink";
 import { PREFECTURES, type Prefecture } from "../geo/prefectures";
 import { MUNICIPALITIES } from "../geo/municipalities";
 import { searchMunicipalities } from "../geo/municipality-search";
@@ -85,11 +87,17 @@ const closeButtonStyle: React.CSSProperties = {
 export function PinForm({
   hidden,
   onSubmitted,
+  initialOpen = false,
+  utm = {},
 }: {
   hidden: boolean;
   onSubmitted: (pin: Pin) => void;
+  // initialOpen=true（ディープリンク post=1）のとき、着地直後にフォームを開いた状態にする。
+  initialOpen?: boolean;
+  // utm はディープリンクで受け取った流入元。投稿時に payload へ載せて計測する。
+  utm?: UTMParams;
 }) {
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(initialOpen);
   const [nickname, setNickname] = useState("");
   const [prefecture, setPrefecture] = useState<Prefecture | "">("");
   const [city, setCity] = useState("");
@@ -130,6 +138,9 @@ export function PinForm({
         city,
         municipality_code: municipalityCode,
         comment: comment || undefined,
+        // 匿名トークンと流入元(utm)は投稿の瞬間にしか記録できないため必ず載せる。
+        anon_token: getOrCreateAnonToken(),
+        ...utm,
       });
       setFormNotice({ kind: "success", text: messages.form.success });
       // 入力をリセットし、打ち込み演出とともに投稿を地図へ反映する。

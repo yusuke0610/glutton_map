@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
@@ -128,6 +129,98 @@ func TestPostApiPins_有効なコードで投稿が保存され201で返る(t *t
 	}
 	if repo.inserted[0].City != "高知市" {
 		t.Errorf("inserted City = %q, want 高知市", repo.inserted[0].City)
+	}
+}
+
+func TestPostApiPins_流入元と匿名トークンと都道府県コードを保存する(t *testing.T) {
+	repo := &fakeRepo{}
+	h := NewHandler(repo)
+
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname:         "如月ファン",
+		Prefecture:       "高知県",
+		City:             "高知市",
+		MunicipalityCode: "39201", // 高知市 → 都道府県コードは先頭2桁の "39"
+		AnonToken:        strptr("anon-xyz"),
+		UtmSource:        strptr("twitter"),
+		UtmMedium:        strptr("social"),
+		UtmCampaign:      strptr("fan_share"),
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("予期しないエラー: %v", err)
+	}
+	if _, ok := resp.(PostApiPins201JSONResponse); !ok {
+		t.Fatalf("レスポンス型が想定外: %T", resp)
+	}
+	if len(repo.inserted) != 1 {
+		t.Fatalf("inserted = %d件, want 1", len(repo.inserted))
+	}
+	got := repo.inserted[0]
+	// 都道府県コードは municipality_code の先頭2桁から導出する（point-in-polygon は使わない）。
+	if got.PrefectureCode != "39" {
+		t.Errorf("PrefectureCode = %q, want 39", got.PrefectureCode)
+	}
+	if got.AnonToken != "anon-xyz" {
+		t.Errorf("AnonToken = %q, want anon-xyz", got.AnonToken)
+	}
+	if got.UTMSource != "twitter" || got.UTMMedium != "social" || got.UTMCampaign != "fan_share" {
+		t.Errorf("UTM = %q/%q/%q, want twitter/social/fan_share", got.UTMSource, got.UTMMedium, got.UTMCampaign)
+	}
+	// 分析用フィールドは地図用レスポンスには出さない（PII 配慮・payload 軽量化）。
+	created := resp.(PostApiPins201JSONResponse)
+	_ = created
+}
+
+func TestPostApiPins_流入元は任意で未指定でも201(t *testing.T) {
+	repo := &fakeRepo{}
+	h := NewHandler(repo)
+
+	// utm/anon_token を一切付けない最初のピン。認証も計測値も無くても通ること（転換率優先）。
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname:         "ファン",
+		Prefecture:       "高知県",
+		City:             "高知市",
+		MunicipalityCode: "39201",
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("予期しないエラー: %v", err)
+	}
+	if _, ok := resp.(PostApiPins201JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want 201", resp)
+	}
+	got := repo.inserted[0]
+	if got.AnonToken != "" || got.UTMSource != "" {
+		t.Errorf("未指定なら空のはず: AnonToken=%q UTMSource=%q", got.AnonToken, got.UTMSource)
+	}
+	// コードがあるので都道府県コードは導出される。
+	if got.PrefectureCode != "39" {
+		t.Errorf("PrefectureCode = %q, want 39", got.PrefectureCode)
+	}
+}
+
+func TestPostApiPins_超過長の計測フィールドは400(t *testing.T) {
+	repo := &fakeRepo{}
+	h := NewHandler(repo)
+
+	long := strptr(strings.Repeat("a", 65)) // maxLength: 64 超え
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname:         "ファン",
+		Prefecture:       "高知県",
+		City:             "高知市",
+		MunicipalityCode: "39201",
+		UtmSource:        long, // strict-server は maxLength を強制しないのでサーバ側で弾く
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("バリデーションエラーは err ではなく 400 で返すべき: %v", err)
+	}
+	if _, ok := resp.(PostApiPins400JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want PostApiPins400JSONResponse", resp)
+	}
+	if len(repo.inserted) != 0 {
+		t.Errorf("inserted = %d件, want 0（超過長は保存しない）", len(repo.inserted))
 	}
 }
 

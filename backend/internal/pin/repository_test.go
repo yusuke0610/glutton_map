@@ -116,6 +116,41 @@ func TestSQLiteRepository_投稿フィールドも往復する(t *testing.T) {
 	}
 }
 
+func TestSQLiteRepository_分析用フィールドも往復する(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+
+	// 後から復元不可能な流入元・投稿時刻系。投稿の瞬間に保存され、往復で欠けないこと。
+	want := Pin{
+		Prefecture: "高知県", Lat: 33.56, Lng: 133.53,
+		PrefectureCode: "39", AnonToken: "anon-xyz",
+		UTMSource: "twitter", UTMMedium: "social", UTMCampaign: "fan_share",
+	}
+	if err := repo.Insert(ctx, want); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	pins, err := repo.GetPins(ctx)
+	if err != nil {
+		t.Fatalf("GetPins: %v", err)
+	}
+	if len(pins) != 1 {
+		t.Fatalf("len(GetPins) = %d, want 1", len(pins))
+	}
+	got := pins[0]
+	if got.PrefectureCode != want.PrefectureCode {
+		t.Errorf("PrefectureCode = %q, want %q", got.PrefectureCode, want.PrefectureCode)
+	}
+	if got.AnonToken != want.AnonToken {
+		t.Errorf("AnonToken = %q, want %q", got.AnonToken, want.AnonToken)
+	}
+	if got.UTMSource != want.UTMSource || got.UTMMedium != want.UTMMedium || got.UTMCampaign != want.UTMCampaign {
+		t.Errorf("UTM = %q/%q/%q, want %q/%q/%q",
+			got.UTMSource, got.UTMMedium, got.UTMCampaign,
+			want.UTMSource, want.UTMMedium, want.UTMCampaign)
+	}
+}
+
 func TestSQLiteRepository_複数Insertを全件返す(t *testing.T) {
 	repo := newTestRepo(t)
 	ctx := context.Background()

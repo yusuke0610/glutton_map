@@ -54,6 +54,56 @@ func TestCoordinateFor_座標は重心付近に収まる(t *testing.T) {
 	}
 }
 
+func TestPrefectureCodeFromMunicipality(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{name: "高知市 39201 → 39", code: "39201", want: "39"},
+		{name: "札幌市中央区 01101 → 01", code: "01101", want: "01"},
+		{name: "ちょうど2桁 13 → 13", code: "13", want: "13"},
+		{name: "1桁は導出不能で空", code: "5", want: ""},
+		{name: "空は空", code: "", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := PrefectureCodeFromMunicipality(tt.code); got != tt.want {
+				t.Errorf("PrefectureCodeFromMunicipality(%q) = %q, want %q", tt.code, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateInflow(t *testing.T) {
+	long := strings.Repeat("a", 65) // maxInflowFieldLen(64) 超え
+
+	tests := []struct {
+		name                                          string
+		anonToken, utmSource, utmMedium, utmCampaign string
+		wantErr                                       bool
+	}{
+		{name: "すべて空はOK（任意項目）", wantErr: false},
+		{name: "通常値はOK", anonToken: "550e8400-e29b-41d4-a716-446655440000", utmSource: "twitter", wantErr: false},
+		{name: "64文字ちょうどはOK", anonToken: strings.Repeat("a", 64), wantErr: false},
+		{name: "anon_token 65文字はNG", anonToken: long, wantErr: true},
+		{name: "utm_source 65文字はNG", utmSource: long, wantErr: true},
+		{name: "utm_medium 65文字はNG", utmMedium: long, wantErr: true},
+		{name: "utm_campaign 65文字はNG", utmCampaign: long, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateInflow(tt.anonToken, tt.utmSource, tt.utmMedium, tt.utmCampaign)
+			if tt.wantErr && err == nil {
+				t.Error("err = nil, want エラー")
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("err = %v, want nil", err)
+			}
+		})
+	}
+}
+
 func TestValidateCreate(t *testing.T) {
 	tests := []struct {
 		name       string

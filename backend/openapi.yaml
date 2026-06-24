@@ -158,6 +158,24 @@ components:
           type: string
           maxLength: 200
           description: 一言コメント（任意）。
+        anon_token:
+          type: string
+          maxLength: 64
+          description: |
+            クライアントが生成・保持する匿名トークン（任意）。後からアカウントへ
+            claim するための識別子。サーバはそのまま保存し、地図には出さない。
+        utm_source:
+          type: string
+          maxLength: 64
+          description: 流入元の計測値（任意）。X 共有リンク等の utm_source。後から復元不可能なため投稿時に記録する。
+        utm_medium:
+          type: string
+          maxLength: 64
+          description: 流入媒体の計測値（任意）。utm_medium。
+        utm_campaign:
+          type: string
+          maxLength: 64
+          description: キャンペーンの計測値（任意）。utm_campaign。
     Error:
       type: object
       required: [message]

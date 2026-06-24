@@ -33,6 +33,15 @@ type pinRow struct {
 	Comment  string `gorm:"not null;default:''"`
 	// IPHash は投稿者の匿名識別子（分析専用）。地図には出さない。既存行は空文字。
 	IPHash string `gorm:"not null;default:'';index"`
+	// 分析専用フィールド。後から復元できない情報を投稿の瞬間に保存する。地図には出さない。
+	// PrefectureCode は JIS 都道府県コード(2桁)。集計高速化の非正規化。既存行は空文字。
+	PrefectureCode string `gorm:"not null;default:'';index"`
+	// AnonToken は匿名投稿者の識別子（後から claim する余地用）。既存行は空文字。
+	AnonToken string `gorm:"not null;default:'';index"`
+	// UTM* は流入元の計測値（X 共有リンク等）。既存行は空文字。
+	UTMSource   string `gorm:"not null;default:''"`
+	UTMMedium   string `gorm:"not null;default:''"`
+	UTMCampaign string `gorm:"not null;default:''"`
 	// CreatedAt は GORM が作成時に自動設定する。連投・curl の時系列分析用。
 	CreatedAt time.Time
 }
@@ -44,6 +53,9 @@ func (r pinRow) toDomain() Pin {
 	return Pin{
 		Prefecture: Prefecture(r.Prefecture), Lat: r.Lat, Lng: r.Lng,
 		Nickname: r.Nickname, City: r.City, Comment: r.Comment,
+		IPHash:         r.IPHash,
+		PrefectureCode: r.PrefectureCode, AnonToken: r.AnonToken,
+		UTMSource: r.UTMSource, UTMMedium: r.UTMMedium, UTMCampaign: r.UTMCampaign,
 	}
 }
 
@@ -51,7 +63,9 @@ func rowFromDomain(p Pin) pinRow {
 	return pinRow{
 		Prefecture: string(p.Prefecture), Lat: p.Lat, Lng: p.Lng,
 		Nickname: p.Nickname, City: p.City, Comment: p.Comment,
-		IPHash: p.IPHash,
+		IPHash:         p.IPHash,
+		PrefectureCode: p.PrefectureCode, AnonToken: p.AnonToken,
+		UTMSource: p.UTMSource, UTMMedium: p.UTMMedium, UTMCampaign: p.UTMCampaign,
 	}
 }
 

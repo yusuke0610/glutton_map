@@ -11,6 +11,8 @@ const (
 	maxNicknameLen = 30
 	maxCityLen     = 50
 	maxCommentLen  = 200
+	// 任意の流入計測フィールド（anon_token / utm_*）の上限。openapi.yaml の maxLength: 64 と一致。
+	maxInflowFieldLen = 64
 )
 
 // jitterRange はピンの座標を都道府県重心から散らすゆらぎ幅（±jitterRange/2）。
@@ -49,6 +51,17 @@ func CoordinateFor(pref Prefecture, r *rand.Rand) (lat, lng float64, ok bool) {
 	return c[0] + jitter(), c[1] + jitter(), true
 }
 
+// PrefectureCodeFromMunicipality は全国地方公共団体コード（市区町村コード）の先頭2桁を
+// 都道府県コード（JIS X 0401）として返す。座標は municipality_code から境界内に生成済みなので、
+// 都道府県コードは point-in-polygon で再判定せずコード先頭2桁から導出すれば完全一致する。
+// 2桁に満たないコードは導出不能として空文字を返す。
+func PrefectureCodeFromMunicipality(code string) string {
+	if len(code) < 2 {
+		return ""
+	}
+	return code[:2]
+}
+
 // EachPrefecture は全都道府県とその重心を fn に渡す（seed 用）。
 // 重心マップを外へ漏らさずに走査できるようにする。
 func EachPrefecture(fn func(pref Prefecture)) {
@@ -71,6 +84,28 @@ func ValidateCreate(nickname, prefecture, city, comment string) error {
 	}
 	if n := utf8.RuneCountInString(comment); n > maxCommentLen {
 		return fmt.Errorf("コメントは%d文字以内で入力してください", maxCommentLen)
+	}
+	return nil
+}
+
+// ValidateInflow は任意の流入計測フィールド（anon_token / utm_*）の長さを検証する。
+// oapi-codegen の strict-server は openapi の maxLength を実行時に強制せず、ルータにも
+// OpenAPI バリデーション middleware を入れていないため、サーバ側で防御的に再チェックして
+// 契約(maxLength: 64)を超える値が無検証で保存されるのを防ぐ。
+func ValidateInflow(anonToken, utmSource, utmMedium, utmCampaign string) error {
+	fields := []struct {
+		name  string
+		value string
+	}{
+		{"anon_token", anonToken},
+		{"utm_source", utmSource},
+		{"utm_medium", utmMedium},
+		{"utm_campaign", utmCampaign},
+	}
+	for _, f := range fields {
+		if utf8.RuneCountInString(f.value) > maxInflowFieldLen {
+			return fmt.Errorf("%s は%d文字以内にしてください", f.name, maxInflowFieldLen)
+		}
 	}
 	return nil
 }

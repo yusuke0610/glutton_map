@@ -54,6 +54,27 @@ func TestCoordinateFor_座標は重心付近に収まる(t *testing.T) {
 	}
 }
 
+func TestPrefectureCodeFromMunicipality(t *testing.T) {
+	tests := []struct {
+		name string
+		code string
+		want string
+	}{
+		{name: "高知市 39201 → 39", code: "39201", want: "39"},
+		{name: "札幌市中央区 01101 → 01", code: "01101", want: "01"},
+		{name: "ちょうど2桁 13 → 13", code: "13", want: "13"},
+		{name: "1桁は導出不能で空", code: "5", want: ""},
+		{name: "空は空", code: "", want: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := PrefectureCodeFromMunicipality(tt.code); got != tt.want {
+				t.Errorf("PrefectureCodeFromMunicipality(%q) = %q, want %q", tt.code, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestValidateCreate(t *testing.T) {
 	tests := []struct {
 		name       string

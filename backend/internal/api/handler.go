@@ -120,6 +120,13 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 		// 投稿は拒否せずそのまま保存し、提出用集計でユニーク化する。
 		// ip_hash はミドルウェアが context に載せた匿名識別子（生IPは持たない）。
 		IPHash: httpmw.IPHashFrom(ctx),
+		// 都道府県コードはコード先頭2桁から導出（座標は境界内に生成済みなので point-in-polygon 不要）。
+		PrefectureCode: pin.PrefectureCodeFromMunicipality(body.MunicipalityCode),
+		// 後から復元できない流入元・匿名トークンを投稿の瞬間に保存する（任意項目）。
+		AnonToken:   strOrEmpty(body.AnonToken),
+		UTMSource:   strOrEmpty(body.UtmSource),
+		UTMMedium:   strOrEmpty(body.UtmMedium),
+		UTMCampaign: strOrEmpty(body.UtmCampaign),
 	}
 	if err := h.repo.Insert(ctx, p); err != nil {
 		slog.Error("ピン投稿の保存に失敗", "error", err)
@@ -195,4 +202,12 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// strOrEmpty は任意ポインタ文字列を非ポインタへ変換する（nil は空文字）。
+func strOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

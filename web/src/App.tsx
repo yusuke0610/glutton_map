@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { fetchPins, fetchPrefectureAt, type Pin } from "./api/api";
+import { parseDeepLink } from "./lib/deeplink";
 import { shouldAnimateDrop, flyToOptionsFor, DROP_TIMING } from "./map/pin-drop";
 import { logger } from "./lib/logger";
 import { messages } from "./lib/messages";
@@ -44,6 +45,12 @@ export default function App() {
   const [total, setTotal] = useState<number | null>(null);
   // ピン打ち込み演出。値があるとき地図上の画面座標 (x,y) に手＋ピンを描画する。
   const [drop, setDrop] = useState<{ x: number; y: number } | null>(null);
+  // ディープリンク（共有/エントリ URL のクエリ）を一度だけ解釈する。
+  // センタリング座標・初期ズーム・投稿モード起動・流入元(utm)を受け取る。
+  const deepLink = useMemo(
+    () => parseDeepLink(typeof window !== "undefined" ? window.location.search : ""),
+    [],
+  );
 
   // ピンを取得して地図ソースへ反映する。初回はソース／レイヤーを追加し、以降は setData で更新する。
   // 読み込み時（map.on("load")）と投稿成功後の両方から呼ぶ。
@@ -84,8 +91,12 @@ export default function App() {
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: mapStyle,
-      center: [137.5, 38.0],
-      zoom: 4.3,
+      // ディープリンクに座標があれば、トップではなく刺せる地点へ直接着地する。
+      center:
+        deepLink.lat !== undefined && deepLink.lng !== undefined
+          ? [deepLink.lng, deepLink.lat]
+          : [137.5, 38.0],
+      zoom: deepLink.zoom ?? 4.3,
       // ズームアウトしすぎて地図が極小になるのを防ぐ（Google マップ程度の下限）。
       minZoom: 3,
       // 北を常に上に固定する（上=ロシア / 下=南極の向きを保つ）。
@@ -181,7 +192,7 @@ export default function App() {
       popupRef.current = null;
       prefPopupRef.current = null;
     };
-  }, [reloadKey, refreshPins]);
+  }, [reloadKey, refreshPins, deepLink]);
 
   // 再試行: キーを増やして useEffect を再実行し、map を作り直す。
   const handleRetry = () => {
@@ -248,8 +259,14 @@ export default function App() {
 
       {total !== null && <HeroCounter total={total} />}
 
-      {/* 投稿フォーム（右上）。読み込みエラー時は全幅バナーと被るため非表示にする。 */}
-      <PinForm hidden={!!error} onSubmitted={playDropAndZoom} />
+      {/* 投稿フォーム（右上）。読み込みエラー時は全幅バナーと被るため非表示にする。
+          ディープリンク post=1 で初期オープン、utm は投稿時に計測値として送る。 */}
+      <PinForm
+        hidden={!!error}
+        onSubmitted={playDropAndZoom}
+        initialOpen={deepLink.openForm}
+        utm={deepLink.utm}
+      />
 
       {error && <ErrorBanner message={error} onRetry={handleRetry} />}
     </div>

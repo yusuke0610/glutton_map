@@ -169,6 +169,10 @@ func (e Prefecture) Valid() bool {
 
 // CreatePinRequest defines model for CreatePinRequest.
 type CreatePinRequest struct {
+	// AnonToken クライアントが生成・保持する匿名トークン（任意）。後からアカウントへ
+	// claim するための識別子。サーバはそのまま保存し、地図には出さない。
+	AnonToken *string `json:"anon_token,omitempty"`
+
 	// City 市区町村（表示用テキスト）。サーバは municipality_code の正規名称で上書きする。
 	City string `json:"city"`
 
@@ -185,6 +189,15 @@ type CreatePinRequest struct {
 
 	// Prefecture 標準47都道府県
 	Prefecture Prefecture `json:"prefecture"`
+
+	// UtmCampaign キャンペーンの計測値（任意）。utm_campaign。
+	UtmCampaign *string `json:"utm_campaign,omitempty"`
+
+	// UtmMedium 流入媒体の計測値（任意）。utm_medium。
+	UtmMedium *string `json:"utm_medium,omitempty"`
+
+	// UtmSource 流入元の計測値（任意）。X 共有リンク等の utm_source。後から復元不可能なため投稿時に記録する。
+	UtmSource *string `json:"utm_source,omitempty"`
 }
 
 // Error defines model for Error.

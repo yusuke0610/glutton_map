@@ -5,7 +5,7 @@
 // この構造を react-i18next 等のキー定義へ発展させられる。
 export const messages = {
   // 画面上部中央に出すアプリのタイトル。
-  title: "914マップ",
+  title: "くいしんぼ如月ファンマップ",
   error: {
     fetchPins: "ピンの取得に失敗しました",
     createPin: "ピンの投稿に失敗しました。時間をおいて再度お試しください。",
@@ -34,5 +34,8 @@ export const messages = {
     button: "Xでシェアする",
     close: "閉じる",
     textLabel: "投稿文（編集できます）",
+  },
+  official: {
+    cta: "くいしんぼ如月公式サイト🍱",
   },
 } as const;

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { messages } from "../lib/messages";
 import {
   buildShareUrl,
@@ -57,8 +58,9 @@ export function ShareButton({
   prefecture?: string;
   onClose: () => void;
 }) {
+  const [text, setText] = useState(() => defaultShareText(prefecture));
   const shareUrl = buildShareUrl(API_BASE, prefecture);
-  const intentUrl = buildTweetIntentUrl(defaultShareText(prefecture), shareUrl);
+  const intentUrl = buildTweetIntentUrl(text, shareUrl);
 
   return (
     <div style={cardStyle}>
@@ -79,6 +81,26 @@ export function ShareButton({
           ×
         </button>
       </div>
+
+      <label
+        style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}
+      >
+        {messages.share.textLabel}
+        <textarea
+          rows={3}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          style={{
+            padding: "6px 8px",
+            borderRadius: 6,
+            border: "1px solid #ccc",
+            font: "inherit",
+            resize: "vertical",
+            boxSizing: "border-box",
+            width: "100%",
+          }}
+        />
+      </label>
 
       <a
         href={intentUrl}

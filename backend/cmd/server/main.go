@@ -14,7 +14,6 @@ import (
 	"github.com/kisaragi-ai-map/backend/internal/db"
 	"github.com/kisaragi-ai-map/backend/internal/httpmw"
 	"github.com/kisaragi-ai-map/backend/internal/logger"
-	"github.com/kisaragi-ai-map/backend/internal/outbound"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
 	"github.com/kisaragi-ai-map/backend/internal/share"
 )
@@ -112,16 +111,6 @@ func main() {
 		PublicBaseURL:   publicBaseURL,
 		FrontendBaseURL: frontendBaseURL,
 	}).Register(router)
-
-	// 公式 URL への計測付き送客 /out（JSON ではないため素 Gin ルート）。
-	// クリック永続化は DB を知る唯一のファイル(pin/repository.go)に実装してあり、
-	// 同じ DB 接続を ClickRepository として共有する。
-	clickRepo, ok := repo.(outbound.ClickRepository)
-	if !ok {
-		log.Error("repo が outbound.ClickRepository を満たしていない")
-		os.Exit(1)
-	}
-	outbound.NewHandler(clickRepo).Register(router)
 
 	addr := ":8001"
 	if port := os.Getenv("PORT"); port != "" {

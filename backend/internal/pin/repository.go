@@ -7,8 +7,6 @@ import (
 
 	"github.com/glebarez/sqlite" // pure Go(modernc ベース)の GORM ドライバ。非cgo。
 	"gorm.io/gorm"
-
-	"github.com/kisaragi-ai-map/backend/internal/outbound"
 )
 
 // PinRepository は永続層の seam。DB の詳細はこの interface の裏に隠す。
@@ -51,21 +49,6 @@ type pinRow struct {
 // TableName は GORM の複数形化（pin_rows）を抑え、テーブル名を pins に固定する。
 func (pinRow) TableName() string { return "pins" }
 
-// outboundClickRow は公式 URL への計測付き送客クリックの永続化モデル。
-// DB を知るのはこのファイルだけ、という隔離原則を守るためここに同居させる
-// （outbound パッケージ自体はドライバを import しない）。
-type outboundClickRow struct {
-	ID          uint   `gorm:"primaryKey;autoIncrement"`
-	Destination string `gorm:"not null;index"` // ホワイトリストのキー（official_menu 等）
-	UTMSource   string `gorm:"not null;default:''"`
-	UTMMedium   string `gorm:"not null;default:''"`
-	UTMCampaign string `gorm:"not null;default:''"`
-	// CreatedAt は UTC で保存する（後から復元できないため）。
-	CreatedAt time.Time `gorm:"not null"`
-}
-
-func (outboundClickRow) TableName() string { return "outbound_clicks" }
-
 func (r pinRow) toDomain() Pin {
 	return Pin{
 		Prefecture: Prefecture(r.Prefecture), Lat: r.Lat, Lng: r.Lng,
@@ -97,7 +80,7 @@ func NewSQLiteRepository(dsn string) (PinRepository, error) {
 	if err != nil {
 		return nil, fmt.Errorf("DB 接続: %w", err)
 	}
-	if err := db.AutoMigrate(&pinRow{}, &outboundClickRow{}); err != nil {
+	if err := db.AutoMigrate(&pinRow{}); err != nil {
 		return nil, fmt.Errorf("マイグレーション: %w", err)
 	}
 	return &sqliteRepo{db: db}, nil
@@ -143,36 +126,4 @@ func (r *sqliteRepo) ListForStats(ctx context.Context) ([]PinStat, error) {
 		stats = append(stats, PinStat{Prefecture: Prefecture(row.Prefecture), IPHash: row.IPHash})
 	}
 	return stats, nil
-}
-
-// RecordClick は outbound.ClickRepository の実装。同じ DB 接続にクリックを1件保存する。
-// 時刻は UTC で保存する（呼び出し側が UTC で渡す前提だが、防御的にここでも UTC へ正規化する）。
-func (r *sqliteRepo) RecordClick(ctx context.Context, c outbound.Click) error {
-	row := outboundClickRow{
-		Destination: c.Destination,
-		UTMSource:   c.UTMSource, UTMMedium: c.UTMMedium, UTMCampaign: c.UTMCampaign,
-		CreatedAt: c.CreatedAt.UTC(),
-	}
-	if err := r.db.WithContext(ctx).Create(&row).Error; err != nil {
-		return fmt.Errorf("クリックの記録: %w", err)
-	}
-	return nil
-}
-
-// listClicks は記録済みクリックを全件返すテスト専用ヘルパ。分析用の読み出し経路は
-// スコープ外（分析 UI は未実装）のため、ここでは結合テストの検証用にのみ提供する。
-func (r *sqliteRepo) listClicks(ctx context.Context) ([]outbound.Click, error) {
-	var rows []outboundClickRow
-	if err := r.db.WithContext(ctx).Find(&rows).Error; err != nil {
-		return nil, fmt.Errorf("クリック一覧の取得: %w", err)
-	}
-	clicks := make([]outbound.Click, 0, len(rows))
-	for _, row := range rows {
-		clicks = append(clicks, outbound.Click{
-			Destination: row.Destination,
-			UTMSource:   row.UTMSource, UTMMedium: row.UTMMedium, UTMCampaign: row.UTMCampaign,
-			CreatedAt: row.CreatedAt,
-		})
-	}
-	return clicks, nil
 }

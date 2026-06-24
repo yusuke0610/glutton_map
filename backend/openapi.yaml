@@ -5,6 +5,12 @@ info:
   description: |
     最小ヒートマップ・スライスの契約。これが唯一の真実（spec-first）。
     Go サーバ型は oapi-codegen、フロント TS 型は openapi-typescript で本ファイルから生成する。
+
+    注: 以下は JSON ではないため本契約（strict-server 生成）の対象外。素の Gin ルートとして
+    cmd/server/main.go で登録する（internal/share, internal/outbound）:
+      - GET /share          … X 共有用に OGP/Twitter Card 入り HTML を SSR で返す
+      - GET /static/ogp.png … 静的 OGP 画像（image/png）
+      - GET /out?to=<key>   … ホワイトリストされた公式 URL へ計測後 302 リダイレクト
 servers:
   - url: http://localhost:8001
 paths:

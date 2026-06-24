@@ -28,6 +28,7 @@ import { AppTitle } from "./components/AppTitle";
 import { HeroCounter } from "./components/HeroCounter";
 import { PinDropOverlay } from "./components/PinDropOverlay";
 import { PinForm } from "./components/PinForm";
+import { ShareButton } from "./components/ShareButton";
 import { ErrorBanner } from "./components/ErrorBanner";
 
 export default function App() {
@@ -45,6 +46,8 @@ export default function App() {
   const [total, setTotal] = useState<number | null>(null);
   // ピン打ち込み演出。値があるとき地図上の画面座標 (x,y) に手＋ピンを描画する。
   const [drop, setDrop] = useState<{ x: number; y: number } | null>(null);
+  // 投稿直後に出す X 共有導線。投稿したピンを保持し、シェアカードに県名を渡す。null = 非表示。
+  const [sharePin, setSharePin] = useState<Pin | null>(null);
   // ディープリンク（共有/エントリ URL のクエリ）を一度だけ解釈する。
   // センタリング座標・初期ズーム・投稿モード起動・流入元(utm)を受け取る。
   const deepLink = useMemo(
@@ -218,6 +221,8 @@ export default function App() {
   // 投稿成功後の演出: ピンを上から落として刺し → 着地でピンを反映 → 市区町村へズーム → popup 表示。
   // prefers-reduced-motion のときは落下演出を省き、ズームと popup だけ実行する。
   const playDropAndZoom = (pin: Pin) => {
+    // 投稿直後に X 共有導線を出す（仲間を増やす動線）。
+    setSharePin(pin);
     const map = mapRef.current;
     if (!map) return;
     const opts = flyToOptionsFor(pin.lng, pin.lat);
@@ -258,6 +263,14 @@ export default function App() {
       <AppTitle />
 
       {total !== null && <HeroCounter total={total} />}
+
+      {/* 投稿直後の X 共有導線。県名を渡して文面・共有 URL を組み立てる。 */}
+      {sharePin && (
+        <ShareButton
+          prefecture={sharePin.prefecture}
+          onClose={() => setSharePin(null)}
+        />
+      )}
 
       {/* 投稿フォーム（右上）。読み込みエラー時は全幅バナーと被るため非表示にする。
           ディープリンク post=1 で初期オープン、utm は投稿時に計測値として送る。 */}

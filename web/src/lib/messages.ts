@@ -28,4 +28,11 @@ export const messages = {
     submitting: "投稿中…",
     success: "投稿しました！マップに反映されます。",
   },
+  share: {
+    // 投稿直後の X 共有導線。
+    heading: "シェアして仲間を増やそう",
+    button: "Xでシェアする",
+    close: "閉じる",
+    textLabel: "投稿文（編集できます）",
+  },
 } as const;

@@ -35,4 +35,9 @@ export const messages = {
     close: "閉じる",
     textLabel: "投稿文（編集できます）",
   },
+  official: {
+    // 公式への計測付き送客リンク。次のアクション（注文・メニュー）に近い導線を優先する。
+    menu: "公式メニューを見る🍱",
+    cta: "くいしんぼ如月で公式サイト🍱",
+  },
 } as const;

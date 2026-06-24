@@ -15,6 +15,7 @@ import (
 	"github.com/kisaragi-ai-map/backend/internal/httpmw"
 	"github.com/kisaragi-ai-map/backend/internal/logger"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
+	"github.com/kisaragi-ai-map/backend/internal/share"
 )
 
 func main() {
@@ -94,6 +95,22 @@ func main() {
 	// strict-server: NewStrictHandler でラップしてから登録する。
 	h := api.NewStrictHandler(api.NewHandler(repo), nil)
 	api.RegisterHandlers(router, h)
+
+	// X 共有用の SSR ルート（/share, /static/ogp.png）。JSON ではないため strict-server には
+	// 乗せず、素の Gin ルートとして登録する。og:image/og:url の絶対化に PUBLIC_BASE_URL、
+	// 人間向けの着地先に FRONTEND_BASE_URL を使う（未設定はローカル開発の既定値）。
+	publicBaseURL := os.Getenv("PUBLIC_BASE_URL")
+	if publicBaseURL == "" {
+		publicBaseURL = "http://localhost:8001"
+	}
+	frontendBaseURL := os.Getenv("FRONTEND_BASE_URL")
+	if frontendBaseURL == "" {
+		frontendBaseURL = "http://localhost:5174"
+	}
+	share.NewHandler(share.Config{
+		PublicBaseURL:   publicBaseURL,
+		FrontendBaseURL: frontendBaseURL,
+	}).Register(router)
 
 	addr := ":8001"
 	if port := os.Getenv("PORT"); port != "" {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/kisaragi-ai-map/backend/internal/pin"
@@ -196,6 +197,30 @@ func TestPostApiPins_流入元は任意で未指定でも201(t *testing.T) {
 	// コードがあるので都道府県コードは導出される。
 	if got.PrefectureCode != "39" {
 		t.Errorf("PrefectureCode = %q, want 39", got.PrefectureCode)
+	}
+}
+
+func TestPostApiPins_超過長の計測フィールドは400(t *testing.T) {
+	repo := &fakeRepo{}
+	h := NewHandler(repo)
+
+	long := strptr(strings.Repeat("a", 65)) // maxLength: 64 超え
+	req := PostApiPinsRequestObject{Body: &PostApiPinsJSONRequestBody{
+		Nickname:         "ファン",
+		Prefecture:       "高知県",
+		City:             "高知市",
+		MunicipalityCode: "39201",
+		UtmSource:        long, // strict-server は maxLength を強制しないのでサーバ側で弾く
+	}}
+	resp, err := h.PostApiPins(context.Background(), req)
+	if err != nil {
+		t.Fatalf("バリデーションエラーは err ではなく 400 で返すべき: %v", err)
+	}
+	if _, ok := resp.(PostApiPins400JSONResponse); !ok {
+		t.Fatalf("レスポンス型 = %T, want PostApiPins400JSONResponse", resp)
+	}
+	if len(repo.inserted) != 0 {
+		t.Errorf("inserted = %d件, want 0（超過長は保存しない）", len(repo.inserted))
 	}
 }
 

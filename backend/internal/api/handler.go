@@ -96,12 +96,18 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 	}
 	body := request.Body
 
-	comment := ""
-	if body.Comment != nil {
-		comment = *body.Comment
-	}
+	comment := strOrEmpty(body.Comment)
 
 	if err := pin.ValidateCreate(body.Nickname, string(body.Prefecture), body.City, comment); err != nil {
+		return PostApiPins400JSONResponse{Message: err.Error()}, nil
+	}
+
+	// 任意の流入計測フィールドはサーバ側で長さを検証する（strict-server は maxLength を強制しない）。
+	anonToken := strOrEmpty(body.AnonToken)
+	utmSource := strOrEmpty(body.UtmSource)
+	utmMedium := strOrEmpty(body.UtmMedium)
+	utmCampaign := strOrEmpty(body.UtmCampaign)
+	if err := pin.ValidateInflow(anonToken, utmSource, utmMedium, utmCampaign); err != nil {
 		return PostApiPins400JSONResponse{Message: err.Error()}, nil
 	}
 
@@ -123,10 +129,10 @@ func (h *Handler) PostApiPins(ctx context.Context, request PostApiPinsRequestObj
 		// 都道府県コードはコード先頭2桁から導出（座標は境界内に生成済みなので point-in-polygon 不要）。
 		PrefectureCode: pin.PrefectureCodeFromMunicipality(body.MunicipalityCode),
 		// 後から復元できない流入元・匿名トークンを投稿の瞬間に保存する（任意項目）。
-		AnonToken:   strOrEmpty(body.AnonToken),
-		UTMSource:   strOrEmpty(body.UtmSource),
-		UTMMedium:   strOrEmpty(body.UtmMedium),
-		UTMCampaign: strOrEmpty(body.UtmCampaign),
+		AnonToken:   anonToken,
+		UTMSource:   utmSource,
+		UTMMedium:   utmMedium,
+		UTMCampaign: utmCampaign,
 	}
 	if err := h.repo.Insert(ctx, p); err != nil {
 		slog.Error("ピン投稿の保存に失敗", "error", err)

@@ -42,4 +42,22 @@ describe("getOrCreateAnonToken", () => {
     const token = getOrCreateAnonToken(undefined);
     expect(token).not.toBe("");
   });
+
+  it("getItem/setItem が例外を投げても投稿を止めない（トークンを返す）", () => {
+    // Safari プライベートモードや quota 超過を模した、必ず throw する Storage。
+    const throwing = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: () => {},
+      clear: () => {},
+      key: () => null,
+      length: 0,
+    } as unknown as Storage;
+    const token = getOrCreateAnonToken(throwing);
+    expect(token).not.toBe("");
+  });
 });

@@ -29,6 +29,7 @@ import { HeroCounter } from "./components/HeroCounter";
 import { PinDropOverlay } from "./components/PinDropOverlay";
 import { PinForm } from "./components/PinForm";
 import { ShareButton } from "./components/ShareButton";
+import { OfficialCTA } from "./components/OfficialCTA";
 import { ErrorBanner } from "./components/ErrorBanner";
 
 export default function App() {
@@ -280,6 +281,9 @@ export default function App() {
         initialOpen={deepLink.openForm}
         utm={deepLink.utm}
       />
+
+      {/* 常設の公式送客 CTA。読み込みエラー時はバナーと被るため非表示にする。 */}
+      {!error && <OfficialCTA />}
 
       {error && <ErrorBanner message={error} onRetry={handleRetry} />}
     </div>

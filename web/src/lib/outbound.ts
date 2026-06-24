@@ -5,7 +5,6 @@
 // OUTBOUND は backend のホワイトリストキーと対応する。
 export const OUTBOUND = {
   menu: "official_menu",
-  sns: "official_sns",
 } as const;
 
 // outboundUrl は backend の /out?to=<key> を組み立てる。

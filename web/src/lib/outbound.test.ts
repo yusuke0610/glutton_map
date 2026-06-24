@@ -8,8 +8,8 @@ describe("outboundUrl", () => {
   });
 
   it("末尾スラッシュを二重にしない", () => {
-    expect(outboundUrl("https://api.example.com/", OUTBOUND.sns)).toBe(
-      "https://api.example.com/out?to=official_sns",
+    expect(outboundUrl("https://api.example.com/", OUTBOUND.menu)).toBe(
+      "https://api.example.com/out?to=official_menu",
     );
   });
 

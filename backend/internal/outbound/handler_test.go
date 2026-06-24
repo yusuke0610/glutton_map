@@ -95,14 +95,14 @@ func TestOut_計測失敗でも送客は止めない(t *testing.T) {
 	repo := &fakeClickRepo{err: errors.New("db down")}
 	r := newRouter(repo)
 
-	req := httptest.NewRequest(http.MethodGet, "/out?to=official_sns", nil)
+	req := httptest.NewRequest(http.MethodGet, "/out?to=official_menu", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusFound {
 		t.Fatalf("status = %d, want 302（計測失敗でも送客）", w.Code)
 	}
-	if loc := w.Header().Get("Location"); loc != Destinations["official_sns"] {
-		t.Errorf("Location = %q, want %q", loc, Destinations["official_sns"])
+	if loc := w.Header().Get("Location"); loc != Destinations["official_menu"] {
+		t.Errorf("Location = %q, want %q", loc, Destinations["official_menu"])
 	}
 }

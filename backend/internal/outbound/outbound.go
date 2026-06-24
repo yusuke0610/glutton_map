@@ -19,7 +19,6 @@ import (
 // 次のアクションに近い URL を優先する（注文・メニュー・公式 SNS フォロー > トップページ）。
 var Destinations = map[string]string{
 	"official_menu": "http://www.nanban-tabetai.jp/",
-	"official_sns":  "https://www.kisaragi-bento.example.com/sns",
 }
 
 // Resolve はホワイトリストから送客先 URL を引く。未知のキーは ok=false。

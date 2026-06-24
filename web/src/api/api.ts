@@ -4,6 +4,7 @@ import { logger } from "../lib/logger";
 export type PinsResponse = components["schemas"]["PinsResponse"];
 export type Pin = components["schemas"]["Pin"];
 export type CreatePinRequest = components["schemas"]["CreatePinRequest"];
+export type PrefectureStat = components["schemas"]["PrefectureStat"];
 
 // API のベースURL。Vite の環境変数 VITE_API_BASE で指定する（ビルド時に焼き込まれる）。
 // 値は web/.env 等で設定する前提。
@@ -31,6 +32,23 @@ export async function createPin(payload: CreatePinRequest): Promise<Pin> {
   if (!res.ok) {
     logger.error("createPin failed", res.status);
     throw new Error(`createPin failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+// fetchPrefectureAt はクリック地点(lat/lng)の都道府県とそのピン合計件数を取得する。
+// 地点がどの都道府県にも属さない(海上など)場合は 404 が返るので null を返し、呼び出し側は吹き出しを出さない。
+export async function fetchPrefectureAt(
+  lat: number,
+  lng: number,
+): Promise<PrefectureStat | null> {
+  const res = await fetch(
+    `${API_BASE}/api/prefectures/at?lat=${lat}&lng=${lng}`,
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    logger.error("fetchPrefectureAt failed", res.status);
+    throw new Error(`fetchPrefectureAt failed: ${res.status}`);
   }
   return res.json();
 }

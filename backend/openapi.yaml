@@ -55,6 +55,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/prefectures/at:
+    get:
+      operationId: getPrefectureAt
+      summary: クリック地点の都道府県とそのピン合計件数を返す
+      description: |
+        地図クリックの座標(lat/lng)を受け取り、行政区域ポリゴンで都道府県を判定して
+        その都道府県のピン合計件数を返す。地点がどの都道府県にも属さない(海上など)場合は 404。
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+          description: クリック地点の緯度。
+        - name: lng
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+          description: クリック地点の経度。
+      responses:
+        "200":
+          description: 都道府県とピン合計件数
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrefectureStat"
+        "400":
+          description: パラメータが不正
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: 地点に該当する都道府県がない(海上など)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: サーバ内部エラー
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     Pin:
@@ -132,6 +179,15 @@ components:
         total:
           type: integer
           description: ピン総数。
+    PrefectureStat:
+      type: object
+      required: [prefecture, count]
+      properties:
+        prefecture:
+          $ref: "#/components/schemas/Prefecture"
+        count:
+          type: integer
+          description: その都道府県のピン合計件数。
     Prefecture:
       type: string
       description: 標準47都道府県

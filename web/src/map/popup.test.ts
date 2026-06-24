@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { popupHTML } from "./popup";
+import { popupHTML, prefectureStatHTML } from "./popup";
 
 describe("popupHTML", () => {
   it("ニックネーム・都道府県・市区町村・コメントを含む", () => {
@@ -29,5 +29,19 @@ describe("popupHTML", () => {
     const html = popupHTML({ nickname: "ファン", prefecture: "東京都", city: "渋谷区" });
     expect(html).toContain("ファン");
     expect(typeof html).toBe("string");
+  });
+});
+
+describe("prefectureStatHTML", () => {
+  it("都道府県名と人数を含む", () => {
+    const html = prefectureStatHTML({ prefecture: "東京都", count: 42 });
+    expect(html).toContain("東京都");
+    expect(html).toContain("42人");
+  });
+
+  it("0人でも壊れない", () => {
+    const html = prefectureStatHTML({ prefecture: "鳥取県", count: 0 });
+    expect(html).toContain("鳥取県");
+    expect(html).toContain("0人");
   });
 });

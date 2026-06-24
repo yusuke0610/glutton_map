@@ -36,3 +36,12 @@ export function popupHTML(props: PinPopupProps): string {
   parts.push(`</div>`);
   return parts.join("");
 }
+
+// prefectureStatHTML はクリック地点の都道府県とそのピン合計件数の吹き出し HTML を組み立てる。
+// 都道府県名は enum 由来だが、popupHTML と同様に念のためエスケープして XSS を防ぐ。
+export function prefectureStatHTML(stat: {
+  prefecture: string;
+  count: number;
+}): string {
+  return `<div class="pin-popup"><strong>${escapeHTML(stat.prefecture)}</strong> ${stat.count}人</div>`;
+}

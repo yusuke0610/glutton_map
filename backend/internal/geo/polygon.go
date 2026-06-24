@@ -25,6 +25,11 @@ type BBox struct {
 	MaxLat float64
 }
 
+// Contains は点が外接矩形の内側（境界含む）かを返す。点内包判定の安価な足切りに使う。
+func (b BBox) Contains(p Point) bool {
+	return p.Lng >= b.MinLng && p.Lng <= b.MaxLng && p.Lat >= b.MinLat && p.Lat <= b.MaxLat
+}
+
 // ringContains はレイキャスティング法で点が輪の内側かを判定する。
 // 境界線上の点の扱いは未定義（用途上、内外どちらでも害がない）。
 func ringContains(r Ring, p Point) bool {

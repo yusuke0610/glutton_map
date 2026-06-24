@@ -48,3 +48,27 @@ func TestSummarize(t *testing.T) {
 		})
 	}
 }
+
+func TestCountByPrefecture(t *testing.T) {
+	pins := []Pin{
+		{Prefecture: "東京都"},
+		{Prefecture: "大阪府"},
+		{Prefecture: "東京都"},
+	}
+	tests := []struct {
+		name   string
+		target Prefecture
+		want   int
+	}{
+		{"対象県の件数を数える", "東京都", 2},
+		{"別の県は別に数える", "大阪府", 1},
+		{"ピンが無い県は0件", "高知県", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CountByPrefecture(pins, tt.target); got != tt.want {
+				t.Errorf("CountByPrefecture(%q) = %d, want %d", tt.target, got, tt.want)
+			}
+		})
+	}
+}

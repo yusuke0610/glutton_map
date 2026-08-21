@@ -7,7 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/oapi-codegen/oapi-codegen/v2 v2.8.0
-	github.com/oapi-codegen/runtime v1.6.0
+	github.com/oapi-codegen/runtime v1.7.0
 	gorm.io/gorm v1.31.2
 )
 

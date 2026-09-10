@@ -18,11 +18,14 @@ backend/e2e.db
 web/.env
 web/.env.*
 !web/.env.example
+!web/.env.test
 
 # secrets — ルートの実 env ファイルは管理外（docker-compose が自動で読む。.env.example だけ追跡）
-.env
-.env.*
-!.env.example
+# パスを / で始めてリポジトリルート直下だけに限定する（無指定だと web/.env.* 等にも
+# マッチしてしまい、上の !web/.env.test の再許可を無効化してしまうため）。
+/.env
+/.env.*
+!/.env.example
 
 # misc
 .DS_Store

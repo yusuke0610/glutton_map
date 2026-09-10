@@ -4,10 +4,10 @@ import {
   buildTweetIntentUrl,
   defaultShareText,
 } from "../lib/share";
+import { API_BASE } from "../lib/config";
 
 // 投稿直後に出す X 共有導線。編集可能な文面 + UTM 付き共有 URL で intent を開く。
 // apiBase は backend の公開 URL（共有リンクの /share がここを指す）。
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const cardStyle: React.CSSProperties = {
   position: "absolute",

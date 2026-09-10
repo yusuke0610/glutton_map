@@ -10,3 +10,11 @@ services:
       - LIBSQL_URL=${LIBSQL_URL}
       # 許可するフロントのオリジン（カンマ区切りで複数可）
       - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}
+    healthcheck:
+      # FROM scratch のイメージにはシェル/curl が無いため、サーバ自身の
+      # healthcheck サブコマンドで GET /healthz を叩く。
+      test: ["CMD", "/app/server", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

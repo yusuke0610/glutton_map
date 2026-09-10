@@ -20,6 +20,8 @@ type PinRepository interface {
 	Insert(ctx context.Context, p Pin) error
 	// ListForStats は提出用集計に必要な最小データ（prefecture/ip_hash）を全件返す。
 	ListForStats(ctx context.Context) ([]PinStat, error)
+	// Ping は DB との疎通確認のみ行う（ヘルスチェックの readiness 用）。
+	Ping(ctx context.Context) error
 }
 
 // pinRow は永続化モデル。スキーマ（カラム/制約）を知るのはこのファイルだけ。
@@ -143,6 +145,14 @@ func (r *sqliteRepo) ListForStats(ctx context.Context) ([]PinStat, error) {
 		stats = append(stats, PinStat{Prefecture: Prefecture(row.Prefecture), IPHash: row.IPHash})
 	}
 	return stats, nil
+}
+
+// Ping は DB へ疎通確認のクエリを1つ投げるだけの軽量チェック（ヘルスチェック用）。
+func (r *sqliteRepo) Ping(ctx context.Context) error {
+	if err := r.db.WithContext(ctx).Exec("SELECT 1").Error; err != nil {
+		return fmt.Errorf("DB 疎通確認: %w", err)
+	}
+	return nil
 }
 
 // RecordClick は outbound.ClickRepository の実装。同じ DB 接続にクリックを1件保存する。

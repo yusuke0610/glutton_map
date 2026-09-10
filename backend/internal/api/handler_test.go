@@ -36,6 +36,9 @@ func (f *fakeRepo) Insert(ctx context.Context, p pin.Pin) error {
 // ListForStats は handler のテストでは使わないので最小限のスタブ。
 func (f *fakeRepo) ListForStats(ctx context.Context) ([]pin.PinStat, error) { return nil, nil }
 
+// Ping は handler のテストでは使わないので最小限のスタブ。
+func (f *fakeRepo) Ping(ctx context.Context) error { return nil }
+
 func TestGetApiPins_集計して返す(t *testing.T) {
 	// 東京2件・大阪1件 → 3都道府県ではなく2都道府県、総数3。
 	repo := &fakeRepo{pins: []pin.Pin{

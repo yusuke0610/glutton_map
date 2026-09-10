@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -12,14 +16,23 @@ import (
 
 	"github.com/kisaragi-ai-map/backend/internal/api"
 	"github.com/kisaragi-ai-map/backend/internal/db"
+	"github.com/kisaragi-ai-map/backend/internal/health"
 	"github.com/kisaragi-ai-map/backend/internal/httpmw"
 	"github.com/kisaragi-ai-map/backend/internal/logger"
 	"github.com/kisaragi-ai-map/backend/internal/outbound"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
+	"github.com/kisaragi-ai-map/backend/internal/server"
 	"github.com/kisaragi-ai-map/backend/internal/share"
 )
 
 func main() {
+	// `server healthcheck` サブコマンド: FROM scratch のイメージにはシェルも
+	// curl も無いため、docker-compose の healthcheck からこのバイナリ自身を呼ぶ。
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		runHealthcheck()
+		return
+	}
+
 	// 構造化ロガーを用意し、標準 slog のデフォルトにも設定する。
 	log := logger.New(os.Stdout)
 	slog.SetDefault(log)
@@ -128,13 +141,53 @@ func main() {
 	}
 	outbound.NewHandler(clickRepo).Register(router)
 
+	// ヘルスチェック（readiness）。ロードバランサ/PaaS の生存確認や E2E の
+	// webServer 待機に使う軽い経路。DB 疎通に失敗したら 503 を返す。
+	health.NewHandler(repo).Register(router)
+
 	addr := ":8001"
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port
 	}
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Error("listen", "error", err)
+		os.Exit(1)
+	}
+
+	httpSrv := &http.Server{
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	// SIGTERM/SIGINT を受けたら ctx をキャンセルし、進行中のリクエストを
+	// 猶予（10秒）内で完了させてから終了する（ローリングデプロイ・docker compose down 対応）。
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	log.Info("server starting", "addr", addr)
-	if err := router.Run(addr); err != nil {
+	if err := server.Run(ctx, httpSrv, ln, 10*time.Second, log); err != nil {
 		log.Error("run", "error", err)
+		os.Exit(1)
+	}
+	log.Info("server stopped")
+}
+
+// runHealthcheck は自プロセスの /healthz を叩き、失敗時は非ゼロで終了する。
+// docker-compose の healthcheck から `server healthcheck` として呼ばれる想定。
+func runHealthcheck() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8001"
+	}
+	url := "http://127.0.0.1:" + port + "/healthz"
+	client := &http.Client{Timeout: 5 * time.Second}
+	if err := health.Check(context.Background(), client, url); err != nil {
+		_, _ = os.Stderr.WriteString(err.Error() + "\n")
 		os.Exit(1)
 	}
 }

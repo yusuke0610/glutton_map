@@ -18,7 +18,7 @@ export default defineConfig({
       // E2E では SEED_ON_START=true で初期ピンを投入し地図描画を検証できるようにする。
       command:
         "cd ../backend && LIBSQL_URL=file:./e2e.db SEED_ON_START=true PORT=8001 go run ./cmd/server",
-      url: "http://localhost:8001/api/pins",
+      url: "http://localhost:8001/healthz",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },

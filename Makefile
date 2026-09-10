@@ -71,8 +71,11 @@ lint-web:
 	cd web && bun install && bun run lint
 
 ## run: API をローカル起動（:8001、PORT env で変更可）
+# IP_HASH_SALT は起動時必須（未設定だとサーバが起動しない）。ローカル開発用の既定値を渡す。
+# 本番相当で試したい場合は IP_HASH_SALT=独自の値 make run のように上書きする。
+IP_HASH_SALT ?= glutton-map-dev-salt
 run:
-	cd backend && LIBSQL_URL=file:./data/pins.db go run ./cmd/server
+	cd backend && LIBSQL_URL=file:./data/pins.db IP_HASH_SALT=$(IP_HASH_SALT) go run ./cmd/server
 
 ## stats: 提出用のユニークファン集計を出力（FORMAT=csv で都道府県別CSV、> でファイル保存）
 stats:

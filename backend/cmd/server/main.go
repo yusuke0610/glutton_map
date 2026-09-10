@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/kisaragi-ai-map/backend/internal/api"
+	"github.com/kisaragi-ai-map/backend/internal/config"
 	"github.com/kisaragi-ai-map/backend/internal/db"
 	"github.com/kisaragi-ai-map/backend/internal/health"
 	"github.com/kisaragi-ai-map/backend/internal/httpmw"
@@ -36,6 +37,17 @@ func main() {
 	// 構造化ロガーを用意し、標準 slog のデフォルトにも設定する。
 	log := logger.New(os.Stdout)
 	slog.SetDefault(log)
+
+	// 事故につながる設定漏れ（IP_HASH_SALT 未設定、release モードでの
+	// TRUSTED_PROXIES 未設定）を、警告ログではなく起動失敗として検出する。
+	if err := config.Validate(config.Env{
+		IPHashSalt:     os.Getenv("IP_HASH_SALT"),
+		TrustedProxies: os.Getenv("TRUSTED_PROXIES"),
+		GinMode:        os.Getenv("GIN_MODE"),
+	}); err != nil {
+		log.Error("startup validation failed", "error", err)
+		os.Exit(1)
+	}
 
 	dsn := os.Getenv("LIBSQL_URL")
 	if dsn == "" {
@@ -101,13 +113,8 @@ func main() {
 
 	// 投稿者の匿名識別子（ip_hash）を context に載せる。投稿は拒否せず、提出用集計で
 	// 連投・curl をユニーク化するために使う。salt は固定値を使うこと（変えると過去ハッシュと
-	// 一致しなくなる）。生IPは保存しない。
-	ipSalt := os.Getenv("IP_HASH_SALT")
-	if ipSalt == "" {
-		ipSalt = "glutton-map-dev-salt" // 開発用デフォルト。本番は IP_HASH_SALT を必ず設定する。
-		log.Warn("IP_HASH_SALT 未設定: 開発用デフォルトを使用（本番では必ず設定すること）")
-	}
-	router.Use(httpmw.IPHashMiddleware(ipSalt))
+	// 一致しなくなる）。生IPは保存しない。未設定は起動時の config.Validate で弾いてある。
+	router.Use(httpmw.IPHashMiddleware(os.Getenv("IP_HASH_SALT")))
 
 	// strict-server: NewStrictHandlerWithOptions でラップしてから登録する。
 	// 既定オプションは生成コードの ErrorHandler（契約外の {"msg": ...}）を

@@ -17,7 +17,7 @@ export default defineConfig({
       // バックエンド。E2E 用の使い捨て DB。通常起動では seed は無効なので、
       // E2E では SEED_ON_START=true で初期ピンを投入し地図描画を検証できるようにする。
       command:
-        "cd ../backend && LIBSQL_URL=file:./e2e.db SEED_ON_START=true PORT=8001 go run ./cmd/server",
+        "cd ../backend && LIBSQL_URL=file:./e2e.db SEED_ON_START=true PORT=8001 IP_HASH_SALT=e2e-test-salt go run ./cmd/server",
       url: "http://localhost:8001/healthz",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

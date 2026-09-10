@@ -35,10 +35,12 @@ type PinStat struct {
 
 // Summary はヒーロー指標の集計結果。
 // PrefectureCount は「何都道府県に散らばっているか」（重複を除いた数）、
-// Total はピンの総数。
+// Total はピンの総数（投稿件数、連投を含む）、
+// UniqueFans は ip_hash で重複排除した「人数」（internal/stats.Build と同じ定義）。
 type Summary struct {
 	PrefectureCount int
 	Total           int
+	UniqueFans      int
 }
 
 // CountByPrefecture は pins のうち target に一致するピンの件数を数える純粋関数。
@@ -54,13 +56,24 @@ func CountByPrefecture(pins []Pin, target Prefecture) int {
 }
 
 // Summarize は pins から Summary を計算する純粋関数。
+// UniqueFans のユニーク化ルールは internal/stats.Build と同じ:
+//   - ip_hash が非空なら、その値で同一ファンとみなす（連投・curl を1人に畳む）。
+//   - ip_hash が空（seed/レガシー由来）の行は、畳まずに各行を1ファンとして数える。
 func Summarize(pins []Pin) Summary {
-	seen := map[Prefecture]struct{}{}
+	seenPref := map[Prefecture]struct{}{}
+	hashes := map[string]struct{}{}
+	emptyHashCount := 0
 	for _, p := range pins {
-		seen[p.Prefecture] = struct{}{}
+		seenPref[p.Prefecture] = struct{}{}
+		if p.IPHash == "" {
+			emptyHashCount++
+			continue
+		}
+		hashes[p.IPHash] = struct{}{}
 	}
 	return Summary{
-		PrefectureCount: len(seen),
+		PrefectureCount: len(seenPref),
 		Total:           len(pins),
+		UniqueFans:      len(hashes) + emptyHashCount,
 	}
 }

@@ -43,8 +43,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   // 再試行トリガ。値を増やすと useEffect が再実行され map を作り直す。
   const [reloadKey, setReloadKey] = useState(0);
-  // ピン総数（左上のヒーロー表示用）。null = 未取得。
-  const [total, setTotal] = useState<number | null>(null);
+  // ヒーロー表示用の集計（ユニークファン数・都道府県カバレッジ）。null = 未取得。
+  // total（投稿件数）は連投で水増しされるため画面には出さない。
+  const [heroStats, setHeroStats] = useState<{
+    uniqueFans: number;
+    prefectureCount: number;
+  } | null>(null);
   // ピン打ち込み演出。値があるとき地図上の画面座標 (x,y) に手＋ピンを描画する。
   const [drop, setDrop] = useState<{ x: number; y: number } | null>(null);
   // 投稿直後に出す X 共有導線。投稿したピンを保持し、シェアカードに県名を渡す。null = 非表示。
@@ -85,7 +89,10 @@ export default function App() {
       map.addLayer(heatmapLayer());
       map.addLayer(pinIconLayer());
     }
-    setTotal(res.total);
+    setHeroStats({
+      uniqueFans: res.unique_fans,
+      prefectureCount: res.prefecture_count,
+    });
     setError(null);
   }, []);
 
@@ -125,7 +132,7 @@ export default function App() {
       } catch (e) {
         // 開発者向けはフロー追従で発生箇所のログに、ユーザー向けは一元管理の文言を表示。
         logger.error("地図データの読み込みに失敗", e);
-        setTotal(null);
+        setHeroStats(null);
         setError(messages.error.fetchPins);
       }
     });
@@ -263,7 +270,12 @@ export default function App() {
 
       <AppTitle />
 
-      {total !== null && <HeroCounter total={total} />}
+      {heroStats && (
+        <HeroCounter
+          uniqueFans={heroStats.uniqueFans}
+          prefectureCount={heroStats.prefectureCount}
+        />
+      )}
 
       {/* 投稿直後の X 共有導線。県名を渡して文面・共有 URL を組み立てる。 */}
       {sharePin && (

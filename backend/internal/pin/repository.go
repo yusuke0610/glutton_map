@@ -20,6 +20,9 @@ type PinRepository interface {
 	Insert(ctx context.Context, p Pin) error
 	// ListForStats は提出用集計に必要な最小データ（prefecture/ip_hash）を全件返す。
 	ListForStats(ctx context.Context) ([]PinStat, error)
+	// CountUniqueFansByPrefecture は prefecture のユニークファン数(ip_hashで重複排除)を
+	// SQL側で数える。県クリックのたびに全ピンを読み出さずに済む。
+	CountUniqueFansByPrefecture(ctx context.Context, prefecture Prefecture) (int, error)
 	// Ping は DB との疎通確認のみ行う（ヘルスチェックの readiness 用）。
 	Ping(ctx context.Context) error
 }
@@ -28,7 +31,7 @@ type PinRepository interface {
 // ドメインの Pin には DB 知識（GORM タグ）を持ち込まない（案B: モデル分離）。
 type pinRow struct {
 	ID         uint    `gorm:"primaryKey;autoIncrement"`
-	Prefecture string  `gorm:"not null"`
+	Prefecture string  `gorm:"not null;index"`
 	Lat        float64 `gorm:"not null"`
 	Lng        float64 `gorm:"not null"`
 	// ファン投稿の表示用フィールド。seed 由来のピンでは空文字。
@@ -145,6 +148,23 @@ func (r *sqliteRepo) ListForStats(ctx context.Context) ([]PinStat, error) {
 		stats = append(stats, PinStat{Prefecture: Prefecture(row.Prefecture), IPHash: row.IPHash})
 	}
 	return stats, nil
+}
+
+// CountUniqueFansByPrefecture は prefecture のユニークファン数を SQL で数える。
+// ユニーク化ルールは pin.Summarize / internal/stats.Build と同じ:
+// ip_hash が非空ならその値で重複排除し、空(seed由来)の行は個別に数える。
+func (r *sqliteRepo) CountUniqueFansByPrefecture(ctx context.Context, prefecture Prefecture) (int, error) {
+	var n int64
+	query := `
+		SELECT COUNT(DISTINCT CASE WHEN ip_hash <> '' THEN ip_hash END)
+			+ COUNT(CASE WHEN ip_hash = '' THEN 1 END)
+		FROM pins
+		WHERE prefecture = ?
+	`
+	if err := r.db.WithContext(ctx).Raw(query, string(prefecture)).Scan(&n).Error; err != nil {
+		return 0, fmt.Errorf("都道府県別ユニークファン数の取得: %w", err)
+	}
+	return int(n), nil
 }
 
 // Ping は DB へ疎通確認のクエリを1つ投げるだけの軽量チェック（ヘルスチェック用）。

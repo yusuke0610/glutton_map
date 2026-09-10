@@ -26,9 +26,9 @@ func newTestRouter(repo pin.PinRepository) *gin.Engine {
 
 func TestHTTP_GetApiPins_200とJSON契約(t *testing.T) {
 	repo := &fakeRepo{pins: []pin.Pin{
-		{Prefecture: "東京都", Lat: 35.69, Lng: 139.69},
-		{Prefecture: "東京都", Lat: 35.70, Lng: 139.80},
-		{Prefecture: "大阪府", Lat: 34.69, Lng: 135.50},
+		{Prefecture: "東京都", Lat: 35.69, Lng: 139.69, IPHash: "hashA"},
+		{Prefecture: "東京都", Lat: 35.70, Lng: 139.80, IPHash: "hashA"}, // 同一ファンの連投
+		{Prefecture: "大阪府", Lat: 34.69, Lng: 135.50, IPHash: "hashB"},
 	}}
 	r := newTestRouter(repo)
 
@@ -54,6 +54,9 @@ func TestHTTP_GetApiPins_200とJSON契約(t *testing.T) {
 	}
 	if body.Total != 3 {
 		t.Errorf("total = %d, want 3", body.Total)
+	}
+	if body.UniqueFans != 2 {
+		t.Errorf("unique_fans = %d, want 2（同一ファンの連投は畳む）", body.UniqueFans)
 	}
 	if len(body.Pins) != 3 {
 		t.Errorf("len(pins) = %d, want 3", len(body.Pins))

@@ -17,4 +17,32 @@ describe("PinForm", () => {
 
     expect(cityInput).toHaveValue("");
   });
+
+  it("initialPrefectureが47都道府県に含まれれば都道府県が初期選択される", () => {
+    render(
+      <PinForm
+        hidden={false}
+        onSubmitted={vi.fn()}
+        initialOpen
+        initialPrefecture="高知県"
+      />,
+    );
+
+    const prefectureSelect = screen.getByLabelText("都道府県") as HTMLSelectElement;
+    expect(prefectureSelect.value).toBe("高知県");
+  });
+
+  it("initialPrefectureが47都道府県にない値なら無視され未選択のまま", () => {
+    render(
+      <PinForm
+        hidden={false}
+        onSubmitted={vi.fn()}
+        initialOpen
+        initialPrefecture="存在しない県"
+      />,
+    );
+
+    const prefectureSelect = screen.getByLabelText("都道府県") as HTMLSelectElement;
+    expect(prefectureSelect.value).toBe("");
+  });
 });

@@ -279,6 +279,7 @@ export default function App() {
         hidden={!!error}
         onSubmitted={playDropAndZoom}
         initialOpen={deepLink.openForm}
+        initialPrefecture={deepLink.prefecture}
         utm={deepLink.utm}
       />
 

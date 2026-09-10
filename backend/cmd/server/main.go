@@ -79,6 +79,9 @@ func main() {
 		MaxAge:       12 * time.Hour,
 	}))
 
+	// 認証なしの公開 POST を無制限サイズで受け付けないよう、JSON パース前にボディ上限を課す。
+	router.Use(httpmw.MaxBodyBytes(httpmw.MaxRequestBodyBytes))
+
 	// 投稿(POST)のスパム対策: IP 単位のクールダウン。認証なしの軽い濫用対策。
 	limiter := httpmw.NewLimiter(3 * time.Second)
 	router.Use(limiter.Middleware("POST"))
@@ -93,9 +96,11 @@ func main() {
 	}
 	router.Use(httpmw.IPHashMiddleware(ipSalt))
 
-	// strict-server: NewStrictHandler でラップしてから登録する。
-	h := api.NewStrictHandler(api.NewHandler(repo), nil)
-	api.RegisterHandlers(router, h)
+	// strict-server: NewStrictHandlerWithOptions でラップしてから登録する。
+	// 既定オプションは生成コードの ErrorHandler（契約外の {"msg": ...}）を
+	// Error スキーマ準拠の {"message": ...} へ差し替える。
+	h := api.NewStrictHandlerWithOptions(api.NewHandler(repo), nil, api.DefaultStrictGinServerOptions())
+	api.RegisterHandlersWithOptions(router, h, api.DefaultGinServerOptions())
 
 	// X 共有用の SSR ルート（/share, /static/ogp.png）。JSON ではないため strict-server には
 	// 乗せず、素の Gin ルートとして登録する。og:image/og:url の絶対化に PUBLIC_BASE_URL、

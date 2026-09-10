@@ -18,8 +18,9 @@ import (
 func newTestRouter(repo pin.PinRepository) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	h := NewStrictHandler(NewHandler(repo), nil)
-	RegisterHandlers(r, h)
+	r.Use(httpmw.MaxBodyBytes(httpmw.MaxRequestBodyBytes))
+	h := NewStrictHandlerWithOptions(NewHandler(repo), nil, DefaultStrictGinServerOptions())
+	RegisterHandlersWithOptions(r, h, DefaultGinServerOptions())
 	return r
 }
 
@@ -131,5 +132,117 @@ func TestHTTP_PostApiPins_IPハッシュをミドルウェア経由で保存す�
 	want := httpmw.HashIP(salt, "203.0.113.5")
 	if got := repo.inserted[0].IPHash; got != want {
 		t.Errorf("inserted IPHash = %q, want %q", got, want)
+	}
+}
+
+// errorResponse はテストで Error スキーマ準拠（message キー）を検証するための最小デコード先。
+type errorResponse struct {
+	Message string `json:"message"`
+}
+
+func TestHTTP_GetPrefectureAt_パラメータ不正はmessageキーで内部エラーを漏らさない(t *testing.T) {
+	r := newTestRouter(&fakeRepo{})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/prefectures/at?lat=abc&lng=xyz", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (body=%s)", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "msg") {
+		t.Errorf("body に契約外の msg キーが含まれている: %s", w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "strconv") {
+		t.Errorf("body に Go 内部エラー(strconv)が漏洩している: %s", w.Body.String())
+	}
+	var body errorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("JSON decode: %v (body=%s)", err, w.Body.String())
+	}
+	if body.Message == "" {
+		t.Errorf("message が空: body=%s", w.Body.String())
+	}
+}
+
+func TestHTTP_PostApiPins_不正なJSONボディはmessageキーで返る(t *testing.T) {
+	r := newTestRouter(&fakeRepo{})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pins", bytes.NewBufferString("{not json"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (body=%s)", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "\"msg\"") {
+		t.Errorf("body に契約外の msg キーが含まれている: %s", w.Body.String())
+	}
+	var body errorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("JSON decode: %v (body=%s)", err, w.Body.String())
+	}
+	if body.Message == "" {
+		t.Errorf("message が空: body=%s", w.Body.String())
+	}
+}
+
+func TestHTTP_PostApiPins_上限を超えるボディはJSONパース前に拒否される(t *testing.T) {
+	repo := &fakeRepo{}
+	r := newTestRouter(repo)
+
+	// comment を上限(16KB)より大きくして送る。ValidateCreate の 200 文字チェックに
+	// 到達する前に MaxBytesReader が読み取りを止めることを確認する。
+	huge := strings.Repeat("あ", 20*1024)
+	payload := `{"nickname":"n","prefecture":"高知県","city":"高知市","municipality_code":"39201","comment":"` + huge + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/pins", bytes.NewBufferString(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (body=%s)", w.Code, w.Body.String())
+	}
+	if len(repo.inserted) != 0 {
+		t.Errorf("上限超過なのに inserted = %d件, want 0", len(repo.inserted))
+	}
+	var body errorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("JSON decode: %v (body=%s)", err, w.Body.String())
+	}
+	if body.Message == "" {
+		t.Errorf("message が空: body=%s", w.Body.String())
+	}
+}
+
+func TestHTTP_PostApiPins_最大長ぴったりの入力は通る(t *testing.T) {
+	repo := &fakeRepo{}
+	r := newTestRouter(repo)
+
+	nickname := strings.Repeat("あ", 30)
+	city := "高知市" + strings.Repeat("ぷ", 47)
+	comment := strings.Repeat("こ", 200)
+	payload, err := json.Marshal(map[string]string{
+		"nickname":          nickname,
+		"prefecture":        "高知県",
+		"city":              city,
+		"municipality_code": "39201",
+		"comment":           comment,
+	})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/pins", bytes.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (body=%s)", w.Code, w.Body.String())
+	}
+	if len(repo.inserted) != 1 {
+		t.Fatalf("inserted = %d件, want 1", len(repo.inserted))
 	}
 }

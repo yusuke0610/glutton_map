@@ -46,6 +46,13 @@ func run() error {
 	}
 	report := stats.Build(rows)
 
+	// この集計は ip_hash がユーザーごとにユニークに割り当てられている前提。
+	// TRUSTED_PROXIES を LB/リバースプロキシ背後で設定し忘れると全リクエストが
+	// 同一 IP とみなされ、ip_hash も全員同じになって unique_fans が 1 に畳まれる。
+	fmt.Fprintln(os.Stderr, "stats: 前提 - ip_hash は ClientIP() ごとにユニーク。"+
+		"リバースプロキシ/LB 背後では TRUSTED_PROXIES の設定漏れがあると全員が同一IPとみなされ、"+
+		"unique_fans が不当に小さくなる（README/.env.example 参照）")
+
 	if os.Getenv("FORMAT") == "csv" {
 		return writeCSV(os.Stdout, report)
 	}

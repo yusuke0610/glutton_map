@@ -36,6 +36,24 @@ func (f *fakeRepo) Insert(ctx context.Context, p pin.Pin) error {
 // ListForStats は handler のテストでは使わないので最小限のスタブ。
 func (f *fakeRepo) ListForStats(ctx context.Context) ([]pin.PinStat, error) { return nil, nil }
 
+// Ping は handler のテストでは使わないので最小限のスタブ。
+func (f *fakeRepo) Ping(ctx context.Context) error { return nil }
+
+// CountUniqueFansByPrefecture は pins をフィルタして pin.Summarize と同じルールで数える
+// フェイク実装（本物は SQL で数えるが、ここでは Go 側の集計ロジックで代用する）。
+func (f *fakeRepo) CountUniqueFansByPrefecture(ctx context.Context, prefecture pin.Prefecture) (int, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	var matched []pin.Pin
+	for _, p := range f.pins {
+		if p.Prefecture == prefecture {
+			matched = append(matched, p)
+		}
+	}
+	return pin.Summarize(matched).UniqueFans, nil
+}
+
 func TestGetApiPins_集計して返す(t *testing.T) {
 	// 東京2件・大阪1件 → 3都道府県ではなく2都道府県、総数3。
 	repo := &fakeRepo{pins: []pin.Pin{
@@ -60,6 +78,10 @@ func TestGetApiPins_集計して返す(t *testing.T) {
 	}
 	if got.Total != 3 {
 		t.Errorf("Total = %d, want 3", got.Total)
+	}
+	// この3件は ip_hash が空(seed相当)なので畳まれず、UniqueFans も Total と同じ3。
+	if got.UniqueFans != 3 {
+		t.Errorf("UniqueFans = %d, want 3", got.UniqueFans)
 	}
 	if len(got.Pins) != 3 {
 		t.Fatalf("len(Pins) = %d, want 3", len(got.Pins))

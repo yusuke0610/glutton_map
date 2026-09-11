@@ -37,7 +37,8 @@ export function popupHTML(props: PinPopupProps): string {
   return parts.join("");
 }
 
-// prefectureStatHTML はクリック地点の都道府県とそのピン合計件数の吹き出し HTML を組み立てる。
+// prefectureStatHTML はクリック地点の都道府県とそのユニークファン数(count)の
+// 吹き出し HTML を組み立てる。count は ip_hash で重複排除した人数（連投は畳む）。
 // 都道府県名は enum 由来だが、popupHTML と同様に念のためエスケープして XSS を防ぐ。
 export function prefectureStatHTML(stat: {
   prefecture: string;

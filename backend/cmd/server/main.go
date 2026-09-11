@@ -3,26 +3,53 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"github.com/kisaragi-ai-map/backend/internal/api"
+	"github.com/kisaragi-ai-map/backend/internal/config"
 	"github.com/kisaragi-ai-map/backend/internal/db"
+	"github.com/kisaragi-ai-map/backend/internal/health"
 	"github.com/kisaragi-ai-map/backend/internal/httpmw"
 	"github.com/kisaragi-ai-map/backend/internal/logger"
 	"github.com/kisaragi-ai-map/backend/internal/outbound"
 	"github.com/kisaragi-ai-map/backend/internal/pin"
+	"github.com/kisaragi-ai-map/backend/internal/server"
 	"github.com/kisaragi-ai-map/backend/internal/share"
 )
 
+const readinessTimeout = 3 * time.Second
+
 func main() {
+	// `server healthcheck` サブコマンド: FROM scratch のイメージにはシェルも
+	// curl も無いため、docker-compose の healthcheck からこのバイナリ自身を呼ぶ。
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		runHealthcheck()
+		return
+	}
+
 	// 構造化ロガーを用意し、標準 slog のデフォルトにも設定する。
 	log := logger.New(os.Stdout)
 	slog.SetDefault(log)
+
+	// 事故につながる設定漏れ（IP_HASH_SALT 未設定、release モードでの
+	// TRUSTED_PROXIES 未設定）を、警告ログではなく起動失敗として検出する。
+	if err := config.Validate(config.Env{
+		IPHashSalt:     os.Getenv("IP_HASH_SALT"),
+		TrustedProxies: os.Getenv("TRUSTED_PROXIES"),
+		GinMode:        os.Getenv("GIN_MODE"),
+	}); err != nil {
+		log.Error("startup validation failed", "error", err)
+		os.Exit(1)
+	}
 
 	dsn := os.Getenv("LIBSQL_URL")
 	if dsn == "" {
@@ -79,23 +106,23 @@ func main() {
 		MaxAge:       12 * time.Hour,
 	}))
 
+	// 認証なしの公開 POST を無制限サイズで受け付けないよう、JSON パース前にボディ上限を課す。
+	router.Use(httpmw.MaxBodyBytes(httpmw.MaxRequestBodyBytes))
+
 	// 投稿(POST)のスパム対策: IP 単位のクールダウン。認証なしの軽い濫用対策。
 	limiter := httpmw.NewLimiter(3 * time.Second)
 	router.Use(limiter.Middleware("POST"))
 
 	// 投稿者の匿名識別子（ip_hash）を context に載せる。投稿は拒否せず、提出用集計で
 	// 連投・curl をユニーク化するために使う。salt は固定値を使うこと（変えると過去ハッシュと
-	// 一致しなくなる）。生IPは保存しない。
-	ipSalt := os.Getenv("IP_HASH_SALT")
-	if ipSalt == "" {
-		ipSalt = "glutton-map-dev-salt" // 開発用デフォルト。本番は IP_HASH_SALT を必ず設定する。
-		log.Warn("IP_HASH_SALT 未設定: 開発用デフォルトを使用（本番では必ず設定すること）")
-	}
-	router.Use(httpmw.IPHashMiddleware(ipSalt))
+	// 一致しなくなる）。生IPは保存しない。未設定は起動時の config.Validate で弾いてある。
+	router.Use(httpmw.IPHashMiddleware(os.Getenv("IP_HASH_SALT")))
 
-	// strict-server: NewStrictHandler でラップしてから登録する。
-	h := api.NewStrictHandler(api.NewHandler(repo), nil)
-	api.RegisterHandlers(router, h)
+	// strict-server: NewStrictHandlerWithOptions でラップしてから登録する。
+	// 既定オプションは生成コードの ErrorHandler（契約外の {"msg": ...}）を
+	// Error スキーマ準拠の {"message": ...} へ差し替える。
+	h := api.NewStrictHandlerWithOptions(api.NewHandler(repo), nil, api.DefaultStrictGinServerOptions())
+	api.RegisterHandlersWithOptions(router, h, api.DefaultGinServerOptions())
 
 	// X 共有用の SSR ルート（/share, /static/ogp.png）。JSON ではないため strict-server には
 	// 乗せず、素の Gin ルートとして登録する。og:image/og:url の絶対化に PUBLIC_BASE_URL、
@@ -123,13 +150,53 @@ func main() {
 	}
 	outbound.NewHandler(clickRepo).Register(router)
 
+	// ヘルスチェック（readiness）。ロードバランサ/PaaS の生存確認や E2E の
+	// webServer 待機に使う軽い経路。DB 疎通に失敗したら 503 を返す。
+	health.NewHandler(repo, readinessTimeout).Register(router)
+
 	addr := ":8001"
 	if port := os.Getenv("PORT"); port != "" {
 		addr = ":" + port
 	}
+
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Error("listen", "error", err)
+		os.Exit(1)
+	}
+
+	httpSrv := &http.Server{
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	// SIGTERM/SIGINT を受けたら ctx をキャンセルし、進行中のリクエストを
+	// 猶予（10秒）内で完了させてから終了する（ローリングデプロイ・docker compose down 対応）。
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	log.Info("server starting", "addr", addr)
-	if err := router.Run(addr); err != nil {
+	if err := server.Run(ctx, httpSrv, ln, 10*time.Second, log); err != nil {
 		log.Error("run", "error", err)
+		os.Exit(1)
+	}
+	log.Info("server stopped")
+}
+
+// runHealthcheck は自プロセスの /healthz を叩き、失敗時は非ゼロで終了する。
+// docker-compose の healthcheck から `server healthcheck` として呼ばれる想定。
+func runHealthcheck() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8001"
+	}
+	url := "http://127.0.0.1:" + port + "/healthz"
+	client := &http.Client{Timeout: 5 * time.Second}
+	if err := health.Check(context.Background(), client, url); err != nil {
+		_, _ = os.Stderr.WriteString(err.Error() + "\n")
 		os.Exit(1)
 	}
 }

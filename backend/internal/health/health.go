@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,11 +19,12 @@ type Pinger interface {
 
 // Handler は /healthz を提供する。
 type Handler struct {
-	pinger Pinger
+	pinger           Pinger
+	readinessTimeout time.Duration
 }
 
-func NewHandler(pinger Pinger) *Handler {
-	return &Handler{pinger: pinger}
+func NewHandler(pinger Pinger, readinessTimeout time.Duration) *Handler {
+	return &Handler{pinger: pinger, readinessTimeout: readinessTimeout}
 }
 
 // Register は GET /healthz を登録する。
@@ -34,7 +36,10 @@ func (h *Handler) Register(r gin.IRouter) {
 // 疎通できなければ 503 を返す（起動直後や DB 障害時にロードバランサから外れるように
 // するため、意図的に 200 ではなく 503 を選ぶ）。
 func (h *Handler) healthz(c *gin.Context) {
-	if err := h.pinger.Ping(c.Request.Context()); err != nil {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.readinessTimeout)
+	defer cancel()
+
+	if err := h.pinger.Ping(ctx); err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "error"})
 		return
 	}

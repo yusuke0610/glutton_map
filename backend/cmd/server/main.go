@@ -26,6 +26,8 @@ import (
 	"github.com/kisaragi-ai-map/backend/internal/share"
 )
 
+const readinessTimeout = 3 * time.Second
+
 func main() {
 	// `server healthcheck` サブコマンド: FROM scratch のイメージにはシェルも
 	// curl も無いため、docker-compose の healthcheck からこのバイナリ自身を呼ぶ。
@@ -150,7 +152,7 @@ func main() {
 
 	// ヘルスチェック（readiness）。ロードバランサ/PaaS の生存確認や E2E の
 	// webServer 待機に使う軽い経路。DB 疎通に失敗したら 503 を返す。
-	health.NewHandler(repo).Register(router)
+	health.NewHandler(repo, readinessTimeout).Register(router)
 
 	addr := ":8001"
 	if port := os.Getenv("PORT"); port != "" {

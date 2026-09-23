@@ -10,7 +10,7 @@
       in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            go gopls gotools        # backend (go 1.22+)
+            go gopls gotools        # backend (go 1.25+)
             golangci-lint           # backend 静的解析
             bun nodejs_22           # web + openapi-typescript
             docker-compose

@@ -6,7 +6,34 @@ services:
     volumes:
       - ./backend/data:/app/data
     environment:
-      # ${VAR:-既定値} … 未設定なら既定値、ルートの .env やシェルがあれば上書き。
+      # ${VAR} … compose がルートの .env（無ければシェル環境）から値を注入する。
+      # ここに書かれていない変数は main.go からは見えない（コンテナに渡らない）。
+      # 値は .env.example を参照。docker compose はカレントディレクトリの .env を自動で読む。
       - LIBSQL_URL=${LIBSQL_URL}
       # 許可するフロントのオリジン（カンマ区切りで複数可）
       - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS}
+      # 必須。未設定だとサーバが起動失敗する（config.Validate）。一度決めたら変更しないこと
+      # （変えると過去の ip_hash と一致しなくなり、ファン数集計が別人扱いになる）。
+      - IP_HASH_SALT=${IP_HASH_SALT}
+      # リバースプロキシ/LB の背後に置く場合、ClientIP() の信頼境界としてそのIPを指定する
+      # （カンマ区切り）。GIN_MODE=release で未設定だと起動失敗する（config.Validate）。
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES}
+      # X共有(OGP)の og:image/og:url を絶対URL化するための公開ベースURL。
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+      # 共有リンクを踏んだ人間の着地先（フロントのオリジン）。
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
+      # リッスンポート。未設定なら 8001。
+      - PORT=${PORT}
+      # true のとき DB が空なら初期ピンを投入する（実運用では既定で無効のまま推奨）。
+      - SEED_ON_START=${SEED_ON_START}
+      # release にすると Gin の起動時ログや挙動が本番向けになり、TRUSTED_PROXIES 未設定時の
+      # fail-fast も有効になる（config.Validate）。未設定なら debug。
+      - GIN_MODE=${GIN_MODE}
+    healthcheck:
+      # FROM scratch のイメージにはシェル/curl が無いため、サーバ自身の
+      # healthcheck サブコマンドで GET /healthz を叩く。
+      test: ["CMD", "/app/server", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

@@ -12,6 +12,7 @@ test("地図ページが /api/pins を取得して地図を描画する", async 
   const body = await (await pinsResponse).json();
   expect(body.total).toBeGreaterThan(0);
   expect(body.prefecture_count).toBeGreaterThan(0);
+  expect(body.unique_fans).toBeGreaterThan(0);
   expect(Array.isArray(body.pins)).toBe(true);
 
   // MapLibre は #map 内の canvas に描画する。canvas が表示されれば地図初期化成功。

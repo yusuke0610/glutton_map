@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { counterText, formatCount } from "./counter";
+import { counterText, formatCount, prefectureCoverageText } from "./counter";
 import { messages } from "./messages";
+import { PREFECTURES } from "../geo/prefectures";
 
 const { prefix, suffix } = messages.counter;
 
@@ -25,5 +26,21 @@ describe("counterText", () => {
 
   it("4桁以上は3桁区切りで読みやすくする", () => {
     expect(counterText(1234)).toBe(`${prefix}1,234${suffix}`);
+  });
+});
+
+describe("prefectureCoverageText", () => {
+  it("N / 47 都道府県 の形式にする", () => {
+    const text = prefectureCoverageText(32);
+    expect(text).toContain("32");
+    expect(text).toContain(String(PREFECTURES.length));
+  });
+
+  it("0件でも壊れない", () => {
+    expect(prefectureCoverageText(0)).toContain("0");
+  });
+
+  it("47件（全都道府県制覇）でも壊れない", () => {
+    expect(prefectureCoverageText(47)).toContain("47");
   });
 });

@@ -84,22 +84,35 @@ const closeButtonStyle: React.CSSProperties = {
 // 投稿フォーム（右上のパネル）。閉じている間はトグルボタンのみ。
 // 自身でフォーム状態を保持し、送信成功時に入力をリセットして onSubmitted(created) を呼ぶ。
 // hidden=true（読み込みエラー時）は全幅エラーバナーと被るため描画しない。
+// isPrefecture は 47都道府県のホワイトリストに含まれるかを判定する（不正値の防御）。
+function isPrefecture(value: string): value is Prefecture {
+  return (PREFECTURES as readonly string[]).includes(value);
+}
+
 export function PinForm({
   hidden,
   onSubmitted,
   initialOpen = false,
+  initialPrefecture,
   utm = {},
 }: {
   hidden: boolean;
   onSubmitted: (pin: Pin) => void;
   // initialOpen=true（ディープリンク post=1）のとき、着地直後にフォームを開いた状態にする。
   initialOpen?: boolean;
+  // initialPrefecture は共有リンクの ?pref= 由来の初期選択都道府県。
+  // 47都道府県のホワイトリストに含まれない値は無視する（未選択のまま）。
+  initialPrefecture?: string;
   // utm はディープリンクで受け取った流入元。投稿時に payload へ載せて計測する。
   utm?: UTMParams;
 }) {
   const [formOpen, setFormOpen] = useState(initialOpen);
   const [nickname, setNickname] = useState("");
-  const [prefecture, setPrefecture] = useState<Prefecture | "">("");
+  const [prefecture, setPrefecture] = useState<Prefecture | "">(
+    initialPrefecture !== undefined && isPrefecture(initialPrefecture)
+      ? initialPrefecture
+      : "",
+  );
   const [city, setCity] = useState("");
   // 選択された市区町村の全国地方公共団体コード。空 = 未選択（自由入力のフォールバック）。
   const [municipalityCode, setMunicipalityCode] = useState("");

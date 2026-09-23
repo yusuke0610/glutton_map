@@ -1,9 +1,9 @@
 import { messages } from "../lib/messages";
 import { OUTBOUND, outboundUrl } from "../lib/outbound";
+import { API_BASE } from "../lib/config";
 
 // 常設の公式送客 CTA（画面左下）。注文・メニューへ近い導線を優先する。
 // リンクは backend の /out 経由でクリックを計測してから公式 URL へ 302 する。
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 const ctaStyle: React.CSSProperties = {
   position: "absolute",

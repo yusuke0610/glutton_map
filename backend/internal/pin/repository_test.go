@@ -174,3 +174,10 @@ func TestSQLiteRepository_複数Insertを全件返す(t *testing.T) {
 		t.Errorf("len(GetPins) = %d, want %d", len(pins), len(in))
 	}
 }
+
+func TestSQLiteRepository_Pingは疎通できていればnilを返す(t *testing.T) {
+	repo := newTestRepo(t)
+	if err := repo.Ping(context.Background()); err != nil {
+		t.Errorf("Ping: %v", err)
+	}
+}

@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## プロジェクト概要
 
-glutton_map — 日本地図上に API から取得したピンをヒートマップ／ピンで描画する縦割りスライス。ヒーロー指標は `prefecture_count`（人数ではなく「何都道府県に散らばっているか」）。ファンは認証なしでピンを投稿でき（`POST /api/pins`：ニックネーム/市区町村/コメント）、座標はサーバが都道府県の重心+ゆらぎで生成する（正確な現在地は受け取らない）。
+glutton_map — 日本地図上に API から取得したピンをヒートマップ／ピンで描画する縦割りスライス。ヒーロー指標は `unique_fans`（ip_hash で重複排除した人数。連投は畳む）と `prefecture_count`（何都道府県に散らばっているか）の2本立て。ファンは認証なしでピンを投稿でき（`POST /api/pins`：ニックネーム/市区町村/コメント）、座標はサーバが都道府県の重心+ゆらぎで生成する（正確な現在地は受け取らない）。
 
 ## 絶対原則
 
-- **spec-first / 単一の真実**: `backend/openapi.yaml` が唯一の契約。Go サーバ型は oapi-codegen、フロント TS 型は openapi-typescript で **同じ yaml から生成する**。**両側の型を手書きしてはいけない**（`internal/api/gen.go` と `web/src/types.gen.ts` は生成物）。
-- **DB の隔離**: `database/sql` とドライバ（`modernc.org/sqlite`）を import してよいのは `backend/internal/pin/repository.go` **だけ**。他層は `PinRepository` interface 越しにアクセスする。`grep -rl "database/sql" internal cmd` が1ファイルに収まることを保つ。
-- **最小スコープ**: スコープ外（実装しない）= LLMモデレーション / Turnstile / 通報 / PostGIS等の高度集計 / クラスタリング / 写真・画像保存（フェーズ2） / go-libsql(cgo)実装 / `weight` カラム。緯度経度はただのカラム、密度は件数で表現する。ピン投稿（ニックネーム/市区町村/コメント）と、ピンクリックでの個別ポップアップ表示は実装済み（フェーズ1）。
+- **spec-first / 単一の真実**: `backend/openapi.yaml` が唯一の契約。Go サーバ型は oapi-codegen、フロント TS 型は openapi-typescript で **同じ yaml から生成する**。**両側の型を手書きしてはいけない**（`internal/api/gen.go` と `web/src/api/types.gen.ts` は生成物）。
+- **DB の隔離**: DB ドライバ（GORM + `github.com/glebarez/sqlite`、pure Go の modernc ベース）を import してよいのは `backend/internal/pin/repository.go` **だけ**。他層は `PinRepository` interface 越しにアクセスする。`grep -rln "gorm.io/gorm\|glebarez/sqlite" internal cmd` が1ファイル（`internal/pin/repository.go`）に収まることを保つ（`database/sql` を直接 import している箇所は無い）。
+- **最小スコープ**: スコープ外（実装しない）= LLMモデレーション / Turnstile / 通報 / PostGIS等の高度集計 / クラスタリング / 写真・画像保存（フェーズ2） / go-libsql(cgo)実装。緯度経度はただのカラム、密度は件数で表現する。`weight` は DB カラムとしては持たず（`Pin.Weight` は API レスポンス生成時に常に `1` を入れる計算値）、フロントのヒートマップ描画でのみ参照する。ピン投稿（ニックネーム/市区町村/コメント）と、ピンクリックでの個別ポップアップ表示は実装済み（フェーズ1）。
 - **TDD 遵守**: 機能追加・変更は必ず **TDD（Red→Green→Refactor）** で進める。まず失敗するテストを書いて赤を確認し、最小実装で緑にし、緑を保ったままリファクタする。**実装を先に書いてはいけない**。テストは `make test` 経由で実行する（詳細は「テスト」節）。
 - **push / PR は勝手にやらない**: `git push` と PR 作成（`gh pr create` 等）は、ユーザーが明示的に指示したときだけ実行する。ローカルでの commit までは進めてよいが、リモートへ反映する操作は必ず事前に許可を取る。
 - **PR 後の追従**: PR を出したら、レビュー指摘（CodeRabbit 等）と CI の結果を追従する。指摘事項があるか CI がこける場合は修正し、再度 push する。ただし、意思決定が必要な変更や、その PR の diff の範囲を逸脱するような指摘があった場合は、修正前に必ずユーザーの承認を取る。
@@ -39,26 +39,35 @@ make lint-web      # フロント eslint（cd web && bun run lint）
 ```
 
 - **backend**: Go 標準 `testing`（`-race`/`-count=1`）＋ **golangci-lint**（`backend/.golangci.yml`）。リポジトリ層は `t.TempDir()` の実 SQLite で結合テスト、HTTP 契約は `httptest` で `/api/pins` を検証する。
-- **frontend**: **vitest**（`web/src/**/*.test.ts`）でロジックを単体テスト、**eslint**（flat config: `web/eslint.config.js`）で静的検査。
-- **E2E**: **Playwright**（`web/e2e/*.spec.ts`、`web/playwright.config.ts`）。backend(:8001)+frontend(:5174)を webServer で起動し、地図がピンを取得・描画するまでを通す。vitest が `*.spec.ts` を拾わないよう vitest の `include` は `src/**/*.test.ts` に限定。
+- **frontend**: **vitest**（`web/src/**/*.test.ts` / `*.test.tsx`、`environment: jsdom`）でロジック・コンポーネントを単体テスト（`@testing-library/react` を使用）、**eslint**（flat config: `web/eslint.config.js`）で静的検査。
+- **E2E**: **Playwright**（`web/e2e/*.spec.ts`、`web/playwright.config.ts`）。backend(:8001)+frontend(:5174)を webServer で起動し、地図がピンを取得・描画するまでを通す。vitest が `*.spec.ts` を拾わないよう vitest の `include` は `src/**/*.test.ts` と `src/**/*.test.tsx` に限定。
 - CI（`.github/workflows/ci.yml`）の PR で **backend-test / backend-lint / web-test / e2e** の4ジョブが自動実行される。
 
 ## アーキテクチャ
 
 ```
 backend/
-  openapi.yaml          # 契約（起点）。変更したら go generate と web の型生成を両方やり直す
-  generate.go           # package tools。//go:generate をモジュールルートに置き、相対パス解決を成立させる
-  tools.go              # oapi-codegen を go.mod に固定（//go:build tools）
-  internal/api/         # gen.go(生成: StrictServerInterface) + handler.go(実装)
-  internal/pin/         # pin.go(ドメイン) + repository.go(DBを知る唯一の場所/seam)
-  internal/db/seed.go   # 重心+ゆらぎで pins 投入（DB空のときのみ）。既定で無効、SEED_ON_START=true でのみ実行
-  cmd/server/main.go    # Gin + CORS(5174) + (任意で seed) + NewStrictHandler でラップして登録
+  openapi.yaml           # 契約（起点）。変更したら go generate と web の型生成を両方やり直す
+  generate.go            # package tools。//go:generate をモジュールルートに置き、相対パス解決を成立させる
+  tools.go               # oapi-codegen を go.mod に固定（//go:build tools）
+  internal/api/          # gen.go(生成: StrictServerInterface) + handler.go(実装) + errors.go(契約準拠エラーハンドラ)
+  internal/pin/          # pin.go(ドメイン) + repository.go(DBを知る唯一の場所/seam)
+  internal/db/seed.go    # 重心+ゆらぎで pins 投入（DB空のときのみ）。既定で無効、SEED_ON_START=true でのみ実行
+  internal/geo/          # 市区町村境界(geojson)のロード・都道府県判定・境界内サンプリング
+  internal/httpmw/       # レート制限・ip_hash 付与・リクエストボディ上限などの横断ミドルウェア
+  internal/health/       # ヘルスチェック(/healthz)。DB疎通確認
+  internal/server/       # http.Server のグレースフルシャットダウン
+  internal/config/       # 起動時バリデーション（IP_HASH_SALT / TRUSTED_PROXIES の設定漏れ検知）
+  internal/share/        # X共有用SSR(/share, /static/ogp.png)
+  internal/outbound/     # 公式URLへの計測付き送客(/out)
+  internal/stats/        # 提出用ユニークファン集計（cmd/stats から使う）
+  cmd/server/main.go     # Gin + CORS + 各ミドルウェア + strict-server 登録 + グレースフルシャットダウン
+  cmd/stats/main.go      # 提出用レポート（unique_fans等）をJSON/CSVで標準出力
 web/
-  src/{App.tsx,api.ts,types.gen.ts}  # MapLibre heatmap。api.ts は生成型 components["schemas"][...] を参照
+  src/{App.tsx,api/api.ts,api/types.gen.ts}  # MapLibre heatmap。api.ts は生成型 components["schemas"][...] を参照
 ```
 
-データの流れ: `main` が DSN(`LIBSQL_URL`)で `NewSQLiteRepository` → （`SEED_ON_START=true` のときだけ空なら `db.Seed`。実データ運用では既定で無効）→ `Handler.GetApiPins` が repo から取得し `prefecture_count`(distinct)/`total` を集計 → strict-server の型付きレスポンス `GetApiPins200JSONResponse` で返す。
+データの流れ: `main` が DSN(`LIBSQL_URL`)で `NewSQLiteRepository` → （`SEED_ON_START=true` のときだけ空なら `db.Seed`。実データ運用では既定で無効）→ `Handler.GetApiPins` が repo から取得し `prefecture_count`(distinct)/`total`(件数)/`unique_fans`(ip_hashで重複排除)を集計 → strict-server の型付きレスポンス `GetApiPins200JSONResponse` で返す。県クリックの集計（`GetPrefectureAt`）は全件取得せず `PinRepository.CountUniqueFansByPrefecture` で SQL 側の `COUNT(DISTINCT ip_hash)` 相当を使う。
 
 ### コード生成の要点
 
@@ -67,5 +76,5 @@ web/
 
 ## 既知の差分・注意
 
-- flake は `go`（nixpkgs unstable に `go_1_22` が無いため）。go.mod は `go 1.22` 互換のまま。
+- `backend/go.mod` は `go 1.25.0`。flake の `go` パッケージ（nixpkgs unstable）と `Dockerfile`（`golang:1.25`）も同じ系列で揃えてある。
 - 将来 Turso embedded（go-libsql, cgo）へ移行する際は、`PinRepository` に `NewLibsqlRepository` を足して main で差し替えるだけにする。cgo 採用時は scratch イメージが使えないため Dockerfile を distroless 等へ変更すること。

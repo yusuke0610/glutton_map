@@ -59,6 +59,7 @@ func (h *Handler) GetApiPins(ctx context.Context, _ GetApiPinsRequestObject) (Ge
 		Pins:            out,
 		PrefectureCount: summary.PrefectureCount,
 		Total:           summary.Total,
+		UniqueFans:      summary.UniqueFans,
 	}, nil
 }
 
@@ -75,13 +76,11 @@ func (h *Handler) GetPrefectureAt(ctx context.Context, request GetPrefectureAtRe
 		return GetPrefectureAt404JSONResponse{Message: "この地点に該当する都道府県がありません"}, nil
 	}
 
-	pins, err := h.repo.GetPins(ctx)
+	count, err := h.repo.CountUniqueFansByPrefecture(ctx, pin.Prefecture(prefecture))
 	if err != nil {
-		slog.Error("ピン取得に失敗", "error", err)
-		return GetPrefectureAt500JSONResponse{Message: "ピンの取得に失敗しました"}, nil
+		slog.Error("都道府県別集計の取得に失敗", "error", err)
+		return GetPrefectureAt500JSONResponse{Message: "集計の取得に失敗しました"}, nil
 	}
-
-	count := pin.CountByPrefecture(pins, pin.Prefecture(prefecture))
 	return GetPrefectureAt200JSONResponse{
 		Prefecture: Prefecture(prefecture),
 		Count:      count,

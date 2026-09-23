@@ -191,7 +191,7 @@ components:
           description: ユーザー向けエラーメッセージ。
     PinsResponse:
       type: object
-      required: [pins, prefecture_count, total]
+      required: [pins, prefecture_count, total, unique_fans]
       properties:
         pins:
           type: array
@@ -202,7 +202,12 @@ components:
           description: ヒーロー指標。何都道府県に散らばっているか。
         total:
           type: integer
-          description: ピン総数。
+          description: ピンの総数（投稿件数。同一ファンの連投も含む）。
+        unique_fans:
+          type: integer
+          description: |
+            ip_hash で重複排除した人数。画面の「人」表示にはこちらを使う
+            （total は投稿件数であり連投で水増しされるため）。
     PrefectureStat:
       type: object
       required: [prefecture, count]
@@ -211,7 +216,7 @@ components:
           $ref: "#/components/schemas/Prefecture"
         count:
           type: integer
-          description: その都道府県のピン合計件数。
+          description: その都道府県のユニークファン数（ip_hashで重複排除）。
     Prefecture:
       type: string
       description: 標準47都道府県

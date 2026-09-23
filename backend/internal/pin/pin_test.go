@@ -8,30 +8,56 @@ func TestSummarize(t *testing.T) {
 		pins                []Pin
 		wantPrefectureCount int
 		wantTotal           int
+		wantUniqueFans      int
 	}{
 		{
-			name:                "空のスライスは0件0都道府県",
+			name:                "空のスライスは0件0都道府県0ファン",
 			pins:                nil,
 			wantPrefectureCount: 0,
 			wantTotal:           0,
+			wantUniqueFans:      0,
 		},
 		{
-			name:                "1件なら1都道府県",
-			pins:                []Pin{{Prefecture: "東京都"}},
+			name:                "1件なら1都道府県1ファン",
+			pins:                []Pin{{Prefecture: "東京都", IPHash: "h1"}},
 			wantPrefectureCount: 1,
 			wantTotal:           1,
+			wantUniqueFans:      1,
 		},
 		{
 			name:                "同じ都道府県が2件でも都道府県数は1（重複除去）",
-			pins:                []Pin{{Prefecture: "東京都"}, {Prefecture: "東京都"}},
+			pins:                []Pin{{Prefecture: "東京都", IPHash: "h1"}, {Prefecture: "東京都", IPHash: "h2"}},
 			wantPrefectureCount: 1,
 			wantTotal:           2,
+			wantUniqueFans:      2,
 		},
 		{
 			name:                "異なる都道府県は別々に数える",
-			pins:                []Pin{{Prefecture: "東京都"}, {Prefecture: "大阪府"}, {Prefecture: "東京都"}},
+			pins:                []Pin{{Prefecture: "東京都", IPHash: "h1"}, {Prefecture: "大阪府", IPHash: "h2"}, {Prefecture: "東京都", IPHash: "h1"}},
 			wantPrefectureCount: 2,
 			wantTotal:           3,
+			wantUniqueFans:      2,
+		},
+		{
+			name: "同一ip_hashの連投はユニークファン数を増やさない（totalとprefecture_countは変わらない）",
+			pins: []Pin{
+				{Prefecture: "高知県", IPHash: "h1"},
+				{Prefecture: "高知県", IPHash: "h1"},
+				{Prefecture: "高知県", IPHash: "h1"},
+			},
+			wantPrefectureCount: 1,
+			wantTotal:           3,
+			wantUniqueFans:      1,
+		},
+		{
+			name: "ip_hashが空(seed由来)の行は畳まず各行を1ファンとして数える",
+			pins: []Pin{
+				{Prefecture: "東京都", IPHash: ""},
+				{Prefecture: "東京都", IPHash: ""},
+			},
+			wantPrefectureCount: 1,
+			wantTotal:           2,
+			wantUniqueFans:      2,
 		},
 	}
 
@@ -44,6 +70,9 @@ func TestSummarize(t *testing.T) {
 			}
 			if got.Total != tt.wantTotal {
 				t.Errorf("Total = %d, want %d", got.Total, tt.wantTotal)
+			}
+			if got.UniqueFans != tt.wantUniqueFans {
+				t.Errorf("UniqueFans = %d, want %d", got.UniqueFans, tt.wantUniqueFans)
 			}
 		})
 	}

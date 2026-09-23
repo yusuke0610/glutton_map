@@ -11,9 +11,11 @@ export const messages = {
     createPin: "ピンの投稿に失敗しました。時間をおいて再度お試しください。",
   },
   counter: {
-    // 左上のヒーロー表示。総数を prefix と suffix で挟む（例: 世界にくいしんぼ12人！）。
+    // 左上のヒーロー表示。ユニークファン数を prefix と suffix で挟む（例: 世界にくいしんぼ12人！）。
     prefix: "全世界にくいしんぼが",
     suffix: "人！",
+    // 都道府県カバレッジ（例: 32 / 47 都道府県に広がりました）。
+    prefectureCoverageSuffix: "都道府県に広がりました",
   },
   form: {
     title: "あなたもくいしんぼになろう",
